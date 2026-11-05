@@ -3,9 +3,12 @@
   'use strict';
 
   const STORAGE_KEY = 'donkiko_dashboard_runs_v1';
+  const PLAYER_KEY = 'donkiko_dashboard_player_v1';
   const MAX_RUNS = 100;
   const MAX_LOG = 8;
   const PERSIST_MS = 3000;
+  const RANKING_TIMEOUT_MS = 9000;
+  const RANKING_REFRESH_MS = 30000;
   const GOAL_X = { 1: 799, 2: 1453, 3: 2345 };
   const RESULT_LABELS = {
     won: 'Victoria',
@@ -31,12 +34,20 @@
     snap: null,
     muted: false,
     connected: false,
-    storageOk: true
+    storageOk: true,
+    playerName: '',
+    ranking: {
+      rows: [],
+      loading: false,
+      error: null,
+      loadedAt: 0
+    }
   };
   let log = [];
   let toastTimer = null;
   let resizeTimer = null;
   let lastPersist = 0;
+  let nameHintShown = false;
 
   /* ---------- Utilidades ---------- */
   const now = () => Date.now();
@@ -71,6 +82,229 @@
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  /* ---------- Ranking global (Supabase) ---------- */
+  const rankingConfig = window.DK_CONFIG || {};
+  const rankingUrl = String(rankingConfig.supabaseUrl || '').replace(/\/+$/, '');
+  const rankingKey = String(rankingConfig.supabaseKey || '');
+  const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
+  const rankingEnabled = !!(rankingUrl && rankingKey);
+
+  function normalizeName(value) {
+    return Array.from(String(value || '').trim()).slice(0, 24).join('');
+  }
+
+  function currentPlayerName() {
+    const input = $('playerName');
+    return normalizeName(input ? input.value : state.playerName);
+  }
+
+  function rankingHeaders(extra = {}) {
+    return {
+      apikey: rankingKey,
+      Authorization: `Bearer ${rankingKey}`,
+      ...extra
+    };
+  }
+
+  function rankingEndpoint(path) {
+    return `${rankingUrl}/rest/v1/${path}`;
+  }
+
+  async function rankingFetch(path, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), RANKING_TIMEOUT_MS);
+    try {
+      return await fetch(rankingEndpoint(path), {
+        cache: 'no-store',
+        ...options,
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function rankingErrorMessage(err) {
+    if (err && err.name === 'AbortError') return 'El ranking tardó demasiado en responder.';
+    const message = String((err && err.message) || '');
+    if (message.includes('HTTP 401') || message.includes('HTTP 403')) {
+      return 'No se pudo autenticar con el ranking. Revisá la clave pública.';
+    }
+    if (message.includes('HTTP 404')) {
+      return 'La vista del ranking no está disponible. Revisá el esquema de Supabase.';
+    }
+    if (location.protocol === 'file:') {
+      return 'No se pudo conectar. Si abriste el archivo con doble clic, probá desde Netlify o http://localhost.';
+    }
+    return 'No se pudo cargar el ranking. Revisá tu conexión.';
+  }
+
+  async function loadRanking() {
+    const st = state.ranking;
+    if (!rankingEnabled) {
+      st.loading = false;
+      st.error = 'El ranking global no está configurado.';
+      renderRanking();
+      return;
+    }
+    if (st.loading) return;
+    st.loading = true;
+    st.error = null;
+    renderRanking();
+    try {
+      const params = new URLSearchParams({
+        select: 'player_name,best_score,best_stage,best_time_ms,runs,last_played',
+        order: 'best_score.desc,best_time_ms.asc.nullslast,last_played.asc',
+        limit: String(rankingLimit)
+      });
+      const res = await rankingFetch(`leaderboard?${params}`, { headers: rankingHeaders() });
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const data = await res.json();
+          detail = data.message || data.hint || '';
+        } catch (e) { /* sin cuerpo útil */ }
+        throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
+      }
+      const data = await res.json();
+      st.rows = Array.isArray(data) ? data.filter(row => row && row.player_name) : [];
+      st.error = null;
+      st.loadedAt = now();
+    } catch (err) {
+      console.warn('Ranking global:', err);
+      st.error = rankingErrorMessage(err);
+    } finally {
+      st.loading = false;
+      renderRanking();
+    }
+  }
+
+  function renderRanking() {
+    const st = state.ranking;
+    const body = $('rankingBody');
+    const empty = $('rankingEmpty');
+    const status = $('rankingStatus');
+    const refresh = $('refreshRankingBtn');
+    const section = document.querySelector('.ranking');
+    if (!body || !empty || !status || !refresh) return;
+
+    if (section) section.setAttribute('aria-busy', st.loading ? 'true' : 'false');
+    refresh.disabled = st.loading || !rankingEnabled;
+    refresh.textContent = st.loading ? 'Actualizando…' : 'Actualizar';
+
+    if (st.loading) {
+      status.dataset.state = 'loading';
+      status.textContent = 'Cargando ranking…';
+    } else if (st.error) {
+      status.dataset.state = 'error';
+      status.textContent = st.error;
+    } else if (!rankingEnabled) {
+      status.dataset.state = 'error';
+      status.textContent = 'El ranking global no está configurado.';
+    } else if (!st.rows.length) {
+      status.dataset.state = 'ok';
+      status.textContent = 'Todavía no hay marcas globales.';
+    } else {
+      const time = st.loadedAt
+        ? new Date(st.loadedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : '—';
+      status.dataset.state = 'ok';
+      status.textContent = `${st.rows.length} jugador${st.rows.length === 1 ? '' : 'es'} · actualizado ${time}`;
+    }
+
+    const me = currentPlayerName().toLowerCase();
+    body.innerHTML = st.rows.map((row, index) => {
+      const name = String(row.player_name || '');
+      const isMe = !!me && name.toLowerCase() === me;
+      const rank = index + 1;
+      const rankClass = rank <= 3 ? ` rank-${rank}` : '';
+      return `<tr class="rank-row${rankClass}${isMe ? ' is-you' : ''}">
+        <td class="rank-cell">${rank}</td>
+        <td>${escapeHtml(name)}${isMe ? ' <span class="you-tag">tú</span>' : ''}</td>
+        <td class="num">${fmtNum(row.best_score)}</td>
+        <td class="num">${clamp(Number(row.best_stage) || 0, 0, 3)} / 3</td>
+        <td class="num">${row.best_time_ms != null ? fmtDuration(row.best_time_ms) : '—'}</td>
+        <td class="num">${fmtNum(row.runs)}</td>
+        <td>${row.last_played ? fmtDate(row.last_played) : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    empty.hidden = st.loading || !!st.error || st.rows.length > 0;
+    if (!empty.hidden) {
+      empty.textContent = rankingEnabled
+        ? 'Aún no hay marcas globales. Juega la campaña desde el Nivel 1.'
+        : 'Configurá Supabase en js/config.js para activar el ranking.';
+    }
+  }
+
+  async function submitRun(run) {
+    if (!run || Number(run.startStage) !== 1) return;
+    if (!['won', 'game_over', 'pau_caught'].includes(run.result)) return;
+    if (!rankingEnabled) return;
+
+    const playerName = currentPlayerName();
+    if (!playerName) {
+      if (!nameHintShown) {
+        nameHintShown = true;
+        toast('Puntaje guardado localmente. Escribe tu nombre en Ranking global para enviarlo.');
+      }
+      return;
+    }
+
+    const levels = (Array.isArray(run.levels) ? run.levels : [])
+      .slice(0, 3)
+      .map(lv => ({
+        stage: clamp(Number(lv.stage) || 1, 1, 3),
+        completed: !!lv.completed,
+        timeMs: Math.max(0, Math.round(Number(lv.timeMs) || 0)),
+        hurts: Math.max(0, Math.round(Number(lv.hurts) || 0)),
+        tokens: Math.max(0, Math.round(Number(lv.tokens) || 0))
+      }));
+    if (!levels.length) return;
+
+    const activeTime = levels.reduce((total, lv) => total + lv.timeMs, 0);
+    const payload = {
+      client_run_id: String(run.id).slice(0, 64),
+      player_name: playerName,
+      score: clamp(Math.round(Number(run.score) || 0), 0, 100000000),
+      result: run.result,
+      start_stage: clamp(Number(run.startStage) || 1, 1, 3),
+      stage_reached: clamp(Number(run.stageReached) || 1, 1, 3),
+      duration_ms: clamp(Math.round(Number(run.durationMs) || 0), 0, 86400000),
+      active_time_ms: clamp(Math.round(activeTime), 0, 86400000),
+      levels
+    };
+
+    try {
+      const res = await rankingFetch('runs', {
+        method: 'POST',
+        headers: rankingHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        }),
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 409) {
+        toast('Esa partida ya estaba en el ranking global.');
+        loadRanking();
+        return;
+      }
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const data = await res.json();
+          detail = data.message || data.hint || '';
+        } catch (e) { /* sin cuerpo útil */ }
+        throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
+      }
+      toast('Puntaje enviado al ranking global.');
+      loadRanking();
+    } catch (err) {
+      console.warn('Ranking global (envío):', err);
+      toast('No se pudo enviar el puntaje; quedó guardado en el historial local.');
+    }
   }
 
   /* ---------- Persistencia ---------- */
@@ -149,6 +383,23 @@
     }
   }
 
+  function loadPlayerName() {
+    let saved = '';
+    try {
+      saved = localStorage.getItem(PLAYER_KEY) || '';
+    } catch (e) { /* el nombre queda solo en memoria */ }
+    state.playerName = normalizeName(saved);
+    const input = $('playerName');
+    if (input) input.value = state.playerName;
+  }
+
+  function persistPlayerName(value) {
+    state.playerName = value;
+    try {
+      localStorage.setItem(PLAYER_KEY, value);
+    } catch (e) { /* el nombre queda solo en memoria */ }
+  }
+
   /* ---------- Modelo de partidas ---------- */
   function currentLevel() {
     const run = state.current;
@@ -167,10 +418,11 @@
   function ensureLevel(stage) {
     const run = state.current;
     if (!run) return null;
+    const n = clamp(Number(stage) || 1, 1, 3);
     let lv = currentLevel();
-    if (!lv || lv.stage !== stage) {
+    if (!lv || lv.stage !== n) {
       closeLevel();
-      lv = { stage, completed: false, closed: false, timeMs: 0, hurts: 0, tokens: 0, startedAt: now() };
+      lv = { stage: n, completed: false, closed: false, timeMs: 0, hurts: 0, tokens: 0, startedAt: now() };
       run.levels.push(lv);
     }
     return lv;
@@ -206,7 +458,10 @@
   function endRun(result, extra = {}) {
     const run = state.current;
     if (!run) return;
-    closeLevel(extra.levelTime);
+    const snapTime = state.snap && typeof state.snap.elapsed === 'number'
+      ? state.snap.elapsed * 1000
+      : undefined;
+    closeLevel(typeof extra.levelTime === 'number' ? extra.levelTime : snapTime);
     run.endedAt = now();
     run.lastSeenAt = run.endedAt;
     run.durationMs = Math.max(0, run.endedAt - run.startedAt);
@@ -219,6 +474,7 @@
     lastPersist = now();
     persist();
     renderAll();
+    if (result !== 'abandoned') submitRun(run);
   }
 
   /* ---------- Telemetría del juego ---------- */
@@ -230,9 +486,10 @@
       const run = state.current;
       run.lastSeenAt = now();
       let lv = currentLevel();
-      if (lv && d.stage !== lv.stage) {
+      const snapStage = Number(d.stage);
+      if (d.phase === 'playing' && lv && Number.isFinite(snapStage) && snapStage !== lv.stage) {
         closeLevel(prev ? prev.elapsed * 1000 : undefined);
-        lv = ensureLevel(d.stage);
+        lv = ensureLevel(snapStage);
       }
       if (lv && !lv.closed) {
         lv.timeMs = Math.round((Number(d.elapsed) || 0) * 1000);
@@ -529,6 +786,20 @@
     toast(wasCurrent ? 'Partida eliminada; la partida en curso ya no se registra' : 'Partida eliminada');
   });
 
+  $('playerName').addEventListener('input', ev => {
+    persistPlayerName(ev.target.value);
+    renderRanking();
+  });
+
+  $('playerName').addEventListener('change', ev => {
+    const name = normalizeName(ev.target.value);
+    ev.target.value = name;
+    persistPlayerName(name);
+    renderRanking();
+  });
+
+  $('refreshRankingBtn').addEventListener('click', loadRanking);
+
   $('filterResult').addEventListener('change', renderTable);
 
   $('exportBtn').addEventListener('click', () => {
@@ -620,13 +891,20 @@
     persist();
   }
 
+  loadPlayerName();
   loadRuns();
   renderLog();
   renderAll();
+  loadRanking();
   window.addEventListener('message', handleGameMessage);
   window.addEventListener('pagehide', persistNow);
+  window.addEventListener('online', () => loadRanking());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') persistNow();
+    if (document.visibilityState === 'hidden') {
+      persistNow();
+    } else if (rankingEnabled && now() - state.ranking.loadedAt > RANKING_REFRESH_MS) {
+      loadRanking();
+    }
   });
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);

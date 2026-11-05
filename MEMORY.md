@@ -1,14 +1,14 @@
 # MEMORY.md — Memoria del proyecto
 
 > Contexto persistente para agentes. `AGENT.md` = reglas (≤ 80 líneas); este archivo = hechos, decisiones y estado.
-> Última actualización: 2026-11-04
+> Última actualización: 2026-11-05
 
 ## 1. Contexto
 
-- Panel web para jugar **Don Kiko: la aventura completa (3 niveles, v2.1)**, ver telemetría, KPIs, historial y (en fase 2) un ranking global.
+- Panel web para jugar **Don Kiko: la aventura completa (3 niveles, v2.1)**, ver telemetría, KPIs, historial y un ranking global compartido.
 - Stack: HTML + CSS + JavaScript vanilla, canvas 2D. Sin dependencias ni build en el frontend.
 - El modo local funciona sin red; el ranking global usa **Supabase** (Postgres + REST).
-- El juego vive en `game/don_kiko.html`; el panel en `index.html` + `js/dashboard.js` + `js/charts.js`.
+- El juego vive en `game/don_kiko.html`; el panel en `index.html` + `js/config.js` + `js/dashboard.js` + `js/charts.js`.
 - El archivo original `../don_kiko_3_niveles_v2_1.html` **no está en la carpeta**; este proyecto incluye su copia con telemetría.
 - Se abre con doble clic (`file://`) o con un servidor local (`python -m http.server 8000`).
 - Repositorio: <https://github.com/Luis-Alejandro-18/Don_kiko>.
@@ -27,28 +27,35 @@
 | 2026-11-04 | Ranking de campaña (`start_stage = 1`) | Evitar que las pruebas de nivel 2/3 inflen el ranking |
 | 2026-11-04 | RLS: `anon` solo lee e inserta | Evitar ediciones/borrados desde el cliente |
 | 2026-11-04 | Cliente directo a Supabase REST; Functions opcional | Menos piezas; se puede endurecer después |
+| 2026-11-05 | URL y publishable key en `js/config.js` | La clave es pública y RLS protege la escritura |
+| 2026-11-05 | Enviar solo campañas terminadas desde Nivel 1 | Evitar pruebas de nivel y abandonadas en el ranking |
+| 2026-11-05 | Ranking top 50: puntaje, mejor tiempo de victoria y última partida | Orden claro y consulta simple |
+| 2026-11-05 | No crear niveles desde snapshots fuera de `playing` | Evitar niveles fantasma en menú/intermission |
+| 2026-11-05 | Nombre sin cuenta; se guarda en `localStorage` | Identidad mínima para el MVP |
 
 ## 3. Arquitectura
 
-- `js/dashboard.js`: IIFE con estado en memoria (`state.runs`, `state.current`, `state.snap`), persistencia en `localStorage`, KPIs, historial, import/export y comandos.
+- `js/config.js`: `window.DK_CONFIG` con `supabaseUrl`, `supabaseKey` (publishable) y `leaderboardLimit`.
+- `js/dashboard.js`: IIFE con estado en memoria (`state.runs`, `state.current`, `state.snap`, `state.ranking`, `state.playerName`), persistencia en `localStorage`, KPIs, historial, ranking, import/export y comandos.
 - `js/charts.js`: expone `window.DKCharts` con `scores`, `results`, `hurts`, `funnel`; dibuja en canvas sin librerías.
 - `game/don_kiko.html`: juego autocontenido; emite telemetría cada 250 ms y en eventos; con `?embed=1` oculta el marco y los controles táctiles.
 - El panel envía comandos al iframe con `postMessage`; el juego solo los acepta si `source === 'dashboard'`.
 - `db/schema.sql`: tabla `runs`, vista `leaderboard`, índices y RLS para Supabase.
 - `db/README.md`: pasos para crear el proyecto, ejecutar el esquema y probar RLS.
+- Ranking: `loadRanking()` consulta `GET /rest/v1/leaderboard` con `fetch` y timeout de 9 s; `submitRun()` hace `POST /rest/v1/runs` al terminar una campaña. La tarjeta muestra carga, vacío, error, actualización manual y resaltado del jugador actual.
 
 ## 3.1 GitHub y despliegue
 
 - Repo: <https://github.com/Luis-Alejandro-18/Don_kiko>.
-- `main`: baseline del dashboard local (commit `70af080`).
-- `feature/db-schema`: esquema inicial de Supabase; PR #1 en draft: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/1>. Se integra cuando el SQL esté probado.
-- `feature/ranking-global`: pendiente (nombre, envío de partidas y tarjeta de ranking).
+- `main`: baseline del dashboard local + merge del PR #1 (`474404b`).
+- `feature/db-schema`: esquema inicial; PR #1 mergeado después de verificar insert/RLS. Rama remota eliminada.
+- `feature/ranking-global`: nombre, envío de campañas y tarjeta de ranking; PR #2 pendiente de crear.
 - Netlify: pendiente de conectar el repo; build vacío y publish `.`.
-- No se debe subir la `service_role` key; la `anon key` es pública y la protege RLS.
+- No se debe subir la `service_role` key; la publishable/`anon key` es pública y la protege RLS.
 
 ## 4. Contrato de datos
 
-- Clave de almacenamiento: `donkiko_dashboard_runs_v1` (máximo 100 partidas).
+- Claves locales: `donkiko_dashboard_runs_v1` (máximo 100 partidas) y `donkiko_dashboard_player_v1` (nombre, 1–24 caracteres).
 - Partida: `id`, `startedAt`, `lastSeenAt`, `endedAt`, `durationMs`, `result`, `startStage`, `stageReached`, `score`, `livesLeft`, `cause`, `levels[]`.
 - Nivel: `stage`, `completed`, `closed`, `timeMs`, `hurts`, `tokens`, `startedAt`.
 - Resultados: `won`, `game_over`, `pau_caught`, `abandoned`, `playing` (solo en curso).
@@ -58,10 +65,15 @@
 - Supabase `runs`: `id`, `client_run_id` (único), `player_name`, `score`, `result`, `start_stage`, `stage_reached`, `duration_ms`, `active_time_ms`, `levels` (JSONB), `created_at`.
 - Vista `leaderboard`: `player_name`, `best_score`, `best_stage`, `best_time_ms`, `runs`, `last_played`.
 - La vista filtra `start_stage = 1` y `result <> 'abandoned'`; las pruebas de nivel 2/3 quedan fuera del ranking de campaña.
+- Envío del panel: solo `startStage === 1` y resultado `won`/`game_over`/`pau_caught`; exige nombre, normaliza a 24 caracteres y arma `levels` con `stage`, `completed`, `timeMs`, `hurts`, `tokens`.
+- `active_time_ms` = suma de `levels[].timeMs`; `duration_ms` es tiempo de pared. El cliente limita score/tiempos y usa `client_run_id` para idempotencia (409 = ya enviada).
+- Lectura: `GET /rest/v1/leaderboard?select=...&order=best_score.desc,best_time_ms.asc.nullslast,last_played.asc&limit=50`.
+- UI del ranking: estados `loading`, `ok`, `error`; vacío; botón **Actualizar**; refresco al enviar, al volver a la pestaña tras 30 s y al recuperar red; resalta el nombre actual.
+- Si no hay nombre, la partida queda local y se muestra un aviso una vez; no se encola para envío posterior.
 
 ## 5. Estado de bugs
 
-Estado tras la revisión y las correcciones del 2026-11-03.
+Estado tras la revisión inicial y la fase 2 (2026-11-05).
 
 | ID | Severidad | Estado | Descripción | Archivos |
 | --- | --- | --- | --- | --- |
@@ -80,6 +92,9 @@ Estado tras la revisión y las correcciones del 2026-11-03.
 | B13 | Baja | Corregido | Canvas con `role="img"`, log con `aria-live` y foco visible al importar | `index.html`, `styles.css` |
 | B14 | Baja | Abierto | Dos pestañas comparten `localStorage` sin sincronizarse | `dashboard.js` |
 | B15 | Baja | Abierto | Gráficas solo se redibujan con `resize` | `charts.js` |
+| B16 | Alta | Corregido | Un snapshot de menú/intermission podía crear un nivel fantasma y corromper el nivel/tiempo activo; ahora solo se cambia de nivel con `phase === 'playing'` y `ensureLevel` normaliza 1–3 | `dashboard.js` |
+| B17 | Media | Limitación | Si la partida termina sin nombre, no se envía al ranking; queda local y solo se avisa una vez | `dashboard.js` |
+| B18 | Baja | Limitación | El ranking depende de la red; `file://` funciona en Chrome probado, pero un navegador podría bloquear CORS | `js/config.js`, `dashboard.js` |
 
 ## 6. Cambios
 
@@ -103,19 +118,36 @@ Estado tras la revisión y las correcciones del 2026-11-03.
 - PR #1 (draft) abierto para revisar el esquema; no mergear hasta probarlo en Supabase.
 - Pendiente: crear el proyecto en Supabase y ejecutar `db/schema.sql` (requiere la cuenta del usuario).
 
+### 2026-11-05
+
+- Proyecto Supabase creado y `db/schema.sql` ejecutado sin errores.
+- Verificado con la publishable key: `POST /rest/v1/runs` → `201`; `DELETE` → `401`; `GET /rest/v1/leaderboard` → `200`.
+- PR #1 mergeado a `main` (`474404b`); rama `feature/db-schema` remota eliminada.
+- Fase 2 implementada en `feature/ranking-global`:
+  - `js/config.js` con URL, publishable key y límite 50.
+  - Campo **Tu nombre** persistido en `localStorage`; resaltado “tú” en la tabla.
+  - Envío de campañas terminadas (`startStage = 1`, `won`/`game_over`/`pau_caught`), con `levels`, `active_time_ms`, `duration_ms` y `client_run_id`.
+  - Tarjeta **Ranking global** con carga, vacío, error, actualización manual/tras envío, orden y top 50.
+  - Corrección de niveles fantasma: `ensureLevel` normaliza 1–3 y los snapshots solo cambian de nivel con `phase === 'playing'`.
+- Verificación E2E con Chrome headless (CDP) en localhost y `file://`: carga vacía, envío `pau_caught`, campaña completa de 3 niveles, orden por puntaje/tiempo y captura 1440×1800.
+- Filas de prueba pendientes de borrar en Supabase (SQL Editor):
+  `delete from public.runs where client_run_id = 'anon-rls-test-1' or player_name in ('Prueba E2E', 'Prueba Won', 'Prueba Won 2');`
+- Actualizados `AGENT.md`, `README.md`, `db/README.md` y este archivo. Netlify sigue pendiente.
+
 ## 7. Backlog
 
 - B6: decidir si "Mejor nivel" debe excluir las partidas de prueba.
 - B14: sincronización entre pestañas (evaluar si compensa).
 - B15: `ResizeObserver` en las tarjetas de gráficas.
 - B11: evaluar si "Abrir juego" puede conservar la telemetría (hoy es una pestaña suelta).
+- B17: evaluar una cola de envío si el jugador termina sin nombre o sin red.
 - Móvil: decidir entre controles táctiles dentro del panel o mantener "Abrir juego" como flujo aparte.
-- Probar un nivel completo para validar el intermission real.
-- Probar Edge y Firefox.
-- Fase 2: integrar el ranking en el panel (nombre, envío y tarjeta global).
-- Crear el proyecto Supabase, ejecutar `db/schema.sql` y probar RLS con `anon`.
+- Probar un nivel completo real para validar el intermission con el nuevo filtro de snapshots.
+- Probar Edge y Firefox; el ranking se probó en Chrome headless.
+- Limpiar las filas de prueba de Supabase antes de compartir el ranking.
 - Conectar Netlify al repo (`main`, build vacío, publish `.`).
-- Evaluar después: ranking por nivel/tiempo, gráficas globales, Auth y Functions.
+- Probar estados de error/carga del ranking con red lenta o clave inválida.
+- Evaluar después: ranking por nivel/tiempo, gráficas globales, Auth, Functions y validación de puntajes en servidor.
 
 ## 8. Verificación
 
@@ -130,15 +162,30 @@ Verificado el 2026-11-03 con Chrome headless y `file://`:
 
 Pendiente de verificar manualmente:
 
-- [ ] Intermission real: completar un nivel y avanzar con **Siguiente nivel**.
+- [ ] Intermission real: completar un nivel y avanzar con **Siguiente nivel** (el filtro de snapshots se probó con eventos simulados).
 - [ ] Exportar e importar desde la interfaz.
-- [ ] Edge, Firefox y servidor local (`http://localhost`).
+- [ ] Edge y Firefox; el ranking se verificó en Chrome headless.
 - [ ] Comportamiento en móvil.
+- [ ] Dos perfiles/navegadores simultáneos; se verificó la lectura compartida desde `localhost` y `file://`.
+- [ ] Estados de carga/error con red lenta o clave inválida.
+
+### Fase 2 (ranking) — 2026-11-05
+
+Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
+
+- [x] `file://` y localhost cargan el ranking vacío sin errores CORS.
+- [x] El nombre se guarda en `localStorage` y sobrevive a la recarga.
+- [x] Un `pau_caught` de campaña se envía con `201`, aparece en `leaderboard` y se muestra en la tabla.
+- [x] Una campaña simulada de 3 niveles envía `levels` 1/2/3, `active_time_ms = 60000` y `best_time_ms = 60000`.
+- [x] El orden por puntaje y mejor tiempo es correcto; el jugador actual se resalta con “tú”.
+- [x] La tarjeta muestra estados de carga, vacío y ok; no hubo errores de consola.
+- [x] El botón **Actualizar** pasa a “Actualizando…” y vuelve a “Actualizar” al terminar.
+- [x] Captura 1440×1800 con la tarjeta de ranking y layout de escritorio correcto.
 
 ### Fase 1 (Supabase)
 
-- [ ] Proyecto creado y `db/schema.sql` ejecutado sin errores.
-- [ ] Insert de prueba y `select * from leaderboard` devuelven datos.
-- [ ] `anon` puede insertar/leer, pero no actualizar ni borrar.
-- [ ] Partida de prueba eliminada.
+- [x] Proyecto creado y `db/schema.sql` ejecutado sin errores.
+- [x] Insert de prueba y `select * from leaderboard` devuelven datos.
+- [x] `anon` puede insertar/leer, pero no actualizar ni borrar (`DELETE` → `401`).
+- [ ] Filas de prueba eliminadas; ver el SQL pendiente en la sección de cambios.
 - [ ] Netlify conectado al repo y sitio estático desplegado.
