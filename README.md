@@ -1,6 +1,8 @@
 # Don Kiko — Dashboard
 
-Panel web para jugar *Don Kiko: la aventura completa (3 niveles, v2.1)* y ver estadísticas en vivo e historial de partidas. Funciona sin Internet y sin instalar nada.
+Panel web para jugar *Don Kiko: la aventura completa (3 niveles, v2.1)* y ver estadísticas en vivo e historial de partidas. El modo local funciona sin Internet y sin instalar nada; el ranking global (fase 2) usará Supabase.
+
+> Repositorio: <https://github.com/Luis-Alejandro-18/Don_kiko>
 
 > Prioridad: **escritorio** (Chrome, Edge o Firefox en Windows, abriendo el archivo con doble clic). En móvil funciona, pero es un alcance secundario.
 
@@ -37,9 +39,18 @@ También puedes usar los botones **Nivel 1/2/3**, **Continuar**, **Pausa**, **Re
 - **Gráficas**: puntos por partida, distribución de resultados, vidas perdidas por nivel y embudo de progreso.
 - **Historial**: fecha, nivel, puntos, vidas, duración, resultado y causa. Se puede filtrar, borrar una partida o todo el historial.
 
+## Ranking global (en preparación)
+
+La base del ranking está definida en [`db/schema.sql`](db/schema.sql) y las instrucciones para crear el proyecto en Supabase están en [`db/README.md`](db/README.md). La integración con el panel llega en la siguiente fase.
+
+- Se compartirán el nombre del jugador, el puntaje y el nivel alcanzado.
+- El ranking de campaña solo contará partidas iniciadas en el **Nivel 1**.
+- El historial local seguirá funcionando sin Internet; el ranking necesitará conexión.
+- Los nombres serán públicos: usa un alias, no tu nombre completo.
+
 ## Guardado y respaldo
 
-El historial se guarda en `localStorage` con la clave `donkiko_dashboard_runs_v1`.
+El historial local se guarda en `localStorage` con la clave `donkiko_dashboard_runs_v1`. El ranking global (fase 2) se guardará en Supabase.
 
 - **Exportar** descarga un JSON con todas las partidas.
 - **Importar** reemplaza el historial por el del archivo; se bloquea mientras hay una partida en curso.
@@ -56,6 +67,8 @@ don_kiko_dashboard/
 ├─ js/dashboard.js     Telemetría, partidas, KPIs e historial
 ├─ js/charts.js        Gráficas en canvas (sin librerías)
 ├─ game/don_kiko.html  Copia del juego con telemetría
+├─ db/schema.sql       Esquema del ranking (Supabase)
+├─ db/README.md        Instrucciones de Supabase
 ├─ AGENT.md            Reglas para agentes (≤ 80 líneas)
 ├─ MEMORY.md           Decisiones, bugs y estado del proyecto
 └─ README.md
