@@ -49,7 +49,7 @@
 - Repo: <https://github.com/Luis-Alejandro-18/Don_kiko>.
 - `main`: baseline del dashboard local + merge del PR #1 (`474404b`).
 - `feature/db-schema`: esquema inicial; PR #1 mergeado después de verificar insert/RLS. Rama remota eliminada.
-- `feature/ranking-global`: nombre, envío de campañas y tarjeta de ranking; PR #2 pendiente de crear.
+- `feature/ranking-global`: nombre, envío de campañas y tarjeta de ranking; PR #2 abierto: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>.
 - Netlify: pendiente de conectar el repo; build vacío y publish `.`.
 - No se debe subir la `service_role` key; la publishable/`anon key` es pública y la protege RLS.
 
@@ -132,7 +132,7 @@ Estado tras la revisión inicial y la fase 2 (2026-11-05).
 - Verificación E2E con Chrome headless (CDP) en localhost y `file://`: carga vacía, envío `pau_caught`, campaña completa de 3 niveles, orden por puntaje/tiempo y captura 1440×1800.
 - Filas de prueba pendientes de borrar en Supabase (SQL Editor):
   `delete from public.runs where client_run_id = 'anon-rls-test-1' or player_name in ('Prueba E2E', 'Prueba Won', 'Prueba Won 2');`
-- Actualizados `AGENT.md`, `README.md`, `db/README.md` y este archivo. Netlify sigue pendiente.
+- Actualizados `AGENT.md`, `README.md`, `db/README.md` y este archivo. PR #2 abierto: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>. Netlify sigue pendiente.
 
 ## 7. Backlog
 
