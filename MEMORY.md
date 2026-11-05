@@ -41,7 +41,7 @@
 
 - Repo: <https://github.com/Luis-Alejandro-18/Don_kiko>.
 - `main`: baseline del dashboard local (commit `70af080`).
-- `feature/db-schema`: esquema inicial de Supabase; se integra cuando el SQL esté probado.
+- `feature/db-schema`: esquema inicial de Supabase; PR #1 en draft: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/1>. Se integra cuando el SQL esté probado.
 - `feature/ranking-global`: pendiente (nombre, envío de partidas y tarjeta de ranking).
 - Netlify: pendiente de conectar el repo; build vacío y publish `.`.
 - No se debe subir la `service_role` key; la `anon key` es pública y la protege RLS.
@@ -100,6 +100,7 @@ Estado tras la revisión y las correcciones del 2026-11-03.
   - `db/schema.sql`: `runs`, índices, RLS, vista `leaderboard` de campaña.
   - `db/README.md`: creación de Supabase, ejecución del SQL, pruebas y RLS.
 - Actualizados `AGENT.md`, `MEMORY.md` y `README.md`.
+- PR #1 (draft) abierto para revisar el esquema; no mergear hasta probarlo en Supabase.
 - Pendiente: crear el proyecto en Supabase y ejecutar `db/schema.sql` (requiere la cuenta del usuario).
 
 ## 7. Backlog
