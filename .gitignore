@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+js/config.local.js
+
+# Netlify / Supabase CLI
+.netlify/
+.supabase/
+supabase/.temp/
+
+# Build y cobertura
+dist/
+coverage/
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/

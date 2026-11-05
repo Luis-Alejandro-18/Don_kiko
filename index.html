@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#081b2b">
+<title>Don Kiko — Dashboard</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1>DON KIKO<span>DASHBOARD · 3 NIVELES</span></h1>
+      <p class="subtitle">Panel de juego, telemetría en vivo e historial de partidas.</p>
+    </div>
+    <div class="header-actions">
+      <span class="badge" id="statusBadge" data-state="menu">Conectando…</span>
+      <button id="openGameBtn" title="Abrir el juego en una pestaña nueva">Abrir juego</button>
+      <button id="exportBtn" title="Descargar el historial en JSON">Exportar</button>
+      <label class="file-btn" title="Cargar un historial JSON">Importar<input type="file" id="importInput" accept="application/json,.json"></label>
+      <button id="clearBtn" class="danger" title="Eliminar todas las partidas guardadas">Borrar historial</button>
+    </div>
+  </header>
+
+  <p class="warning" id="storageWarning" hidden>
+    Este navegador no permite guardar datos locales para este archivo. El historial funcionará solo durante esta sesión; usa <strong>Exportar</strong> para conservarlo.
+  </p>
+
+  <section class="workspace" aria-label="Juego y telemetría">
+    <div class="card game-card">
+      <div class="game-frame">
+        <iframe id="gameFrame" src="game/don_kiko.html?embed=1" title="Juego Don Kiko: tres niveles"></iframe>
+      </div>
+      <div class="game-controls">
+        <button data-cmd="start" data-level="1">Nivel 1</button>
+        <button data-cmd="start" data-level="2">Nivel 2</button>
+        <button data-cmd="start" data-level="3">Nivel 3</button>
+        <button data-cmd="continue" id="continueBtn" disabled>Continuar</button>
+        <button data-cmd="toggle" id="pauseToggleBtn" disabled>Pausa</button>
+        <button data-cmd="restart">Reiniciar</button>
+        <button data-cmd="mute" id="soundToggleBtn">Sonido: sí</button>
+        <span class="hint">Haz clic en el juego para usar el teclado.</span>
+      </div>
+    </div>
+
+    <aside class="card live" aria-label="Estado en vivo">
+      <h2>En vivo</h2>
+      <div class="live-grid">
+        <div class="live-stat"><span>Nivel</span><strong id="liveLevel">1 / 3</strong></div>
+        <div class="live-stat"><span>Puntos</span><strong id="liveScore">000000</strong></div>
+        <div class="live-stat"><span>Vidas</span><strong id="liveLives">♥ ♥ ♥</strong></div>
+        <div class="live-stat"><span>Tiempo nivel</span><strong id="liveTime">0:00</strong></div>
+        <div class="live-stat wide small"><span>Escenario</span><strong id="liveStage">Rescate en el edificio</strong></div>
+        <div class="live-stat small"><span>Posición</span><strong id="livePos">0 px</strong></div>
+        <div class="live-stat small"><span>Pau</span><strong id="livePau">—</strong></div>
+        <div class="live-stat small"><span>Objetos</span><strong id="liveObjects">0</strong></div>
+        <div class="live-stat small"><span>JuanMa</span><strong id="liveFriend">—</strong></div>
+      </div>
+      <div class="progress" aria-hidden="true"><i id="liveProgress"></i></div>
+      <div class="live-log" id="liveLog" aria-live="polite" aria-relevant="additions text"><p class="log-empty">Esperando eventos…</p></div>
+    </aside>
+  </section>
+
+  <section class="kpis" aria-label="Indicadores de rendimiento">
+    <div class="kpi"><span>Partidas</span><strong id="kpiRuns">0</strong><small>finalizadas</small></div>
+    <div class="kpi"><span>Récord</span><strong id="kpiBest">0</strong><small>mejor puntuación</small></div>
+    <div class="kpi"><span>Victorias</span><strong id="kpiWinRate">0%</strong><small id="kpiWins">0 de 0</small></div>
+    <div class="kpi"><span>Mejor nivel</span><strong id="kpiBestStage">—</strong><small>alcanzado</small></div>
+    <div class="kpi"><span>Tiempo medio</span><strong id="kpiAvgTime">—</strong><small>por partida</small></div>
+    <div class="kpi"><span>Puntos totales</span><strong id="kpiTotalPoints">0</strong><small>acumulados</small></div>
+  </section>
+
+  <section class="charts" aria-label="Gráficas">
+    <div class="card chart-card">
+      <h3>Puntos por partida</h3>
+      <canvas id="chartScores" role="img" aria-label="Gráfica de barras con los puntos de las últimas partidas"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h3>Resultados</h3>
+      <canvas id="chartResults" role="img" aria-label="Gráfica de dona con la distribución de resultados"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h3>Vidas perdidas por nivel</h3>
+      <canvas id="chartHurts" role="img" aria-label="Gráfica de barras con las vidas perdidas por nivel"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h3>Progreso de la campaña</h3>
+      <canvas id="chartFunnel" role="img" aria-label="Gráfica de embudo con las partidas que alcanzaron cada nivel"></canvas>
+    </div>
+  </section>
+
+  <section class="card history" aria-label="Historial de partidas">
+    <div class="history-head">
+      <h3>Historial de partidas</h3>
+      <select id="filterResult" aria-label="Filtrar por resultado">
+        <option value="all">Todos los resultados</option>
+        <option value="won">Victorias</option>
+        <option value="game_over">Sin vidas</option>
+        <option value="pau_caught">Atrapado por Pau</option>
+        <option value="abandoned">Abandonadas</option>
+        <option value="playing">En curso</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Nivel</th>
+            <th class="num">Puntos</th>
+            <th class="num">Vidas</th>
+            <th class="num">Duración</th>
+            <th>Resultado</th>
+            <th>Causa</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="historyEmpty">Aún no hay partidas. Juega desde el panel y aparecerán aquí.</p>
+  </section>
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/charts.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>
