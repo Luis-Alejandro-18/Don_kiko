@@ -1,6 +1,6 @@
 # Don Kiko — Dashboard
 
-Panel web para jugar *Don Kiko: la aventura completa (3 niveles, v2.1)* y ver estadísticas en vivo e historial de partidas. El modo local funciona sin Internet y sin instalar nada; el ranking global (fase 2) usará Supabase.
+Panel web para jugar *Don Kiko: la aventura completa (3 niveles, v2.1)* y ver estadísticas en vivo, historial de partidas y un ranking global compartido. El modo local funciona sin Internet y sin instalar nada; el ranking usa Supabase.
 
 > Repositorio: <https://github.com/Luis-Alejandro-18/Don_kiko>
 
@@ -38,19 +38,23 @@ También puedes usar los botones **Nivel 1/2/3**, **Continuar**, **Pausa**, **Re
 - **KPIs**: partidas finalizadas, récord, porcentaje de victorias, mejor nivel, tiempo medio y puntos acumulados.
 - **Gráficas**: puntos por partida, distribución de resultados, vidas perdidas por nivel y embudo de progreso.
 - **Historial**: fecha, nivel, puntos, vidas, duración, resultado y causa. Se puede filtrar, borrar una partida o todo el historial.
+- **Ranking global**: el mejor puntaje de cada jugador en campañas desde el **Nivel 1**, con nivel alcanzado, mejor tiempo de victoria, partidas y última fecha. Se actualiza al terminar una partida o con el botón **Actualizar**.
 
-## Ranking global (en preparación)
+## Ranking global
 
-La base del ranking está definida en [`db/schema.sql`](db/schema.sql) y las instrucciones para crear el proyecto en Supabase están en [`db/README.md`](db/README.md). La integración con el panel llega en la siguiente fase.
+El ranking se guarda en Supabase y se comparte entre jugadores. La base está definida en [`db/schema.sql`](db/schema.sql) y las instrucciones para crear el proyecto en Supabase están en [`db/README.md`](db/README.md).
 
-- Se compartirán el nombre del jugador, el puntaje y el nivel alcanzado.
-- El ranking de campaña solo contará partidas iniciadas en el **Nivel 1**.
-- El historial local seguirá funcionando sin Internet; el ranking necesitará conexión.
-- Los nombres serán públicos: usa un alias, no tu nombre completo.
+- Escribe tu nombre en **Tu nombre**, dentro de la tarjeta **Ranking global**. Se guarda en este navegador (`donkiko_dashboard_player_v1`).
+- Al terminar una campaña iniciada en el **Nivel 1** se envían el nombre, puntaje, resultado, niveles y tiempos.
+- Solo cuentan partidas terminadas (`won`, `game_over`, `pau_caught`). Las pruebas de **Nivel 2/3** y las abandonadas quedan solo en el historial local.
+- Orden: mejor puntaje; desempate: mejor tiempo de victoria; luego la última partida.
+- El historial local sigue funcionando sin Internet; el ranking necesita conexión. Si `file://` funciona en tu Chrome, el ranking también; si el navegador bloquea la red, abre el panel desde Netlify o `http://localhost`.
+- Los nombres son públicos: usa un alias, no tu nombre completo. Si cambias el nombre, tus marcas anteriores quedan con el nombre anterior. Si dos jugadores usan el mismo nombre, sus marcas se agrupan.
+- La publishable key está en `js/config.js`; es pública. Nunca se usa la `service_role` en el frontend.
 
 ## Guardado y respaldo
 
-El historial local se guarda en `localStorage` con la clave `donkiko_dashboard_runs_v1`. El ranking global (fase 2) se guardará en Supabase.
+El historial local se guarda en `localStorage` con la clave `donkiko_dashboard_runs_v1`; el nombre del jugador usa `donkiko_dashboard_player_v1`. El ranking global se guarda en Supabase.
 
 - **Exportar** descarga un JSON con todas las partidas.
 - **Importar** reemplaza el historial por el del archivo; se bloquea mientras hay una partida en curso.
@@ -64,7 +68,8 @@ Si el navegador bloquea `localStorage` para archivos locales, aparece un aviso y
 don_kiko_dashboard/
 ├─ index.html          Panel principal
 ├─ css/styles.css      Estilos
-├─ js/dashboard.js     Telemetría, partidas, KPIs e historial
+├─ js/config.js        URL y publishable key de Supabase
+├─ js/dashboard.js     Telemetría, partidas, KPIs, historial y ranking
 ├─ js/charts.js        Gráficas en canvas (sin librerías)
 ├─ game/don_kiko.html  Copia del juego con telemetría
 ├─ db/schema.sql       Esquema del ranking (Supabase)

@@ -71,6 +71,40 @@
     <div class="kpi"><span>Puntos totales</span><strong id="kpiTotalPoints">0</strong><small>acumulados</small></div>
   </section>
 
+  <section class="card ranking" aria-label="Ranking global">
+    <div class="ranking-head">
+      <div>
+        <h3>Ranking global</h3>
+        <p class="ranking-sub">Campaña desde el Nivel 1 · mejores puntajes</p>
+      </div>
+      <div class="ranking-controls">
+        <label class="name-field" for="playerName">
+          <span>Tu nombre</span>
+          <input id="playerName" type="text" maxlength="24" autocomplete="nickname" spellcheck="false" placeholder="Tu alias" title="Se guarda en este navegador">
+        </label>
+        <button id="refreshRankingBtn" type="button" title="Actualizar el ranking global">Actualizar</button>
+      </div>
+    </div>
+    <p class="ranking-status" id="rankingStatus" data-state="loading" aria-live="polite">Cargando ranking…</p>
+    <div class="table-wrap">
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th class="rank-col">#</th>
+            <th>Jugador</th>
+            <th class="num">Mejor puntaje</th>
+            <th class="num">Nivel</th>
+            <th class="num">Mejor tiempo</th>
+            <th class="num">Partidas</th>
+            <th>Última</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="rankingEmpty" hidden>Aún no hay marcas globales. Juega la campaña desde el Nivel 1.</p>
+  </section>
+
   <section class="charts" aria-label="Gráficas">
     <div class="card chart-card">
       <h3>Puntos por partida</h3>
@@ -125,6 +159,7 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
+<script src="js/config.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/dashboard.js"></script>
 </body>

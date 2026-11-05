@@ -17,7 +17,8 @@ HTML/CSS/JS sin dependencias ni build. El modo local funciona sin red; el rankin
 ## Estructura
 - `index.html`: panel.
 - `css/styles.css`: estilos.
-- `js/dashboard.js`: estado, partidas, KPIs, historial, import/export.
+- `js/config.js`: URL y publishable key de Supabase (pública).
+- `js/dashboard.js`: estado, partidas, KPIs, historial, import/export y ranking.
 - `js/charts.js`: gráficas canvas (`window.DKCharts`).
 - `game/don_kiko.html`: juego + puente `postMessage` (`?embed=1`).
 - `db/schema.sql`: tablas, vista y RLS del ranking.
@@ -33,10 +34,14 @@ Panel → juego (`source: 'dashboard'`):
 - No cambiar nombres ni campos sin actualizar dashboard y `MEMORY.md`.
 
 ## Datos (Supabase)
+- `js/config.js` contiene la URL y la publishable key; es pública y no debe incluir `service_role`.
 - Esquema en `db/schema.sql`; ejecutarlo en Supabase SQL Editor.
 - `runs` guarda partidas; `leaderboard` es la vista de campaña (`start_stage = 1`).
 - RLS: `anon` solo lee e inserta; nunca `service_role` en el frontend.
-- Identidad MVP: `player_name`; sin cuentas. `active_time_ms` = suma de niveles.
+- Identidad MVP: `player_name` (1–24, `localStorage: donkiko_dashboard_player_v1`); sin cuentas.
+- El panel envía solo campañas terminadas (`won`, `game_over`, `pau_caught`) y lee `leaderboard`; pruebas de nivel 2/3 y abandonadas quedan locales.
+- `active_time_ms` = suma de niveles; orden por puntaje y mejor tiempo de victoria como desempate.
+- `file://` se probó en Chrome; si un navegador bloquea la red, usar Netlify o `http://localhost`; el modo local no depende del ranking.
 
 ## Convenciones
 - JS vanilla, IIFE, `'use strict'`; sin frameworks, CDN ni build.
@@ -53,6 +58,9 @@ Panel → juego (`source: 'dashboard'`):
 - [ ] Cerrar a mitad de nivel y verificar puntos guardados al reabrir.
 - [ ] Exportar, borrar e importar el JSON.
 - [ ] `db/schema.sql` ejecutado en Supabase; `select * from leaderboard` responde.
+- [ ] Nombre guardado en localStorage y resaltado en el ranking.
+- [ ] Partida de campaña enviada; el ranking se actualiza sin recargar.
+- [ ] Ranking con estados de carga, vacío, error y actualización manual.
 - [ ] Sin errores en la consola del panel ni del iframe.
 
 ## Reglas para agentes
