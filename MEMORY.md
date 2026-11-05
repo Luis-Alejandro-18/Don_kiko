@@ -50,7 +50,8 @@
 - `main`: baseline + PR #1 (`474404b`) + PR #2 (`d1db77e`); contiene el ranking global.
 - `feature/db-schema`: esquema inicial; PR #1 mergeado después de verificar insert/RLS. Rama remota eliminada.
 - `feature/ranking-global`: nombre, envío de campañas y tarjeta de ranking; PR #2 mergeado (`d1db77e`): <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>.
-- Netlify: pendiente de conectar el repo; build vacío y publish `.`.
+- `feature/netlify-deploy`: `netlify.toml` (build vacío, publish `.`) y pasos en README; PR pendiente de crear.
+- Netlify: no hay CLI ni Node en este equipo; falta conectar la cuenta y verificar el sitio HTTPS.
 - No se debe subir la `service_role` key; la publishable/`anon key` es pública y la protege RLS.
 
 ## 4. Contrato de datos
@@ -132,7 +133,8 @@ Estado tras la revisión inicial y la fase 2 (2026-11-05).
 - Verificación E2E con Chrome headless (CDP) en localhost y `file://`: carga vacía, envío `pau_caught`, campaña completa de 3 niveles, orden por puntaje/tiempo y captura 1440×1800.
 - Filas de prueba pendientes de borrar en Supabase (SQL Editor):
   `delete from public.runs where client_run_id = 'anon-rls-test-1' or player_name in ('Prueba E2E', 'Prueba Won', 'Prueba Won 2');`
-- Actualizados `AGENT.md`, `README.md`, `db/README.md` y este archivo. PR #2 mergeado en `main` (`d1db77e`): <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>. Netlify sigue pendiente.
+- Actualizados `AGENT.md`, `README.md`, `db/README.md` y este archivo. PR #2 mergeado en `main` (`d1db77e`): <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>.
+- Fase 3 preparada: `netlify.toml` con build vacío y publish `.`, y sección de despliegue en README. No hay Netlify CLI ni Node en el equipo; falta conectar la cuenta del usuario y verificar la URL HTTPS.
 
 ## 7. Backlog
 
@@ -145,7 +147,7 @@ Estado tras la revisión inicial y la fase 2 (2026-11-05).
 - Probar un nivel completo real para validar el intermission con el nuevo filtro de snapshots.
 - Probar Edge y Firefox; el ranking se probó en Chrome headless.
 - Limpiar las filas de prueba de Supabase antes de compartir el ranking.
-- Conectar Netlify al repo (`main`, build vacío, publish `.`).
+- Conectar Netlify al repo (`main`, build vacío, publish `.`) y verificar HTTPS; `netlify.toml` ya está listo.
 - Probar estados de error/carga del ranking con red lenta o clave inválida.
 - Evaluar después: ranking por nivel/tiempo, gráficas globales, Auth, Functions y validación de puntajes en servidor.
 
@@ -188,4 +190,9 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] Insert de prueba y `select * from leaderboard` devuelven datos.
 - [x] `anon` puede insertar/leer, pero no actualizar ni borrar (`DELETE` → `401`).
 - [ ] Filas de prueba eliminadas; ver el SQL pendiente en la sección de cambios.
-- [ ] Netlify conectado al repo y sitio estático desplegado.
+
+### Fase 3 (Netlify)
+
+- [x] `netlify.toml` con build vacío y publish `.`; pasos en README.
+- [ ] Conectar la cuenta de Netlify al repo y desplegar `main`.
+- [ ] Verificar la URL HTTPS y el ranking desde el sitio desplegado.

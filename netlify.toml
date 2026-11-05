@@ -1,0 +1,5 @@
+# Sitio estático de Don Kiko Dashboard.
+# No hay build: se publica la raíz del repositorio.
+[build]
+  command = ""
+  publish = "."
