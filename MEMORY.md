@@ -47,10 +47,10 @@
 ## 3.1 GitHub y despliegue
 
 - Repo: <https://github.com/Luis-Alejandro-18/Don_kiko>.
-- `main`: baseline + PR #1 (`474404b`) + PR #2 (`d1db77e`); contiene el ranking global.
+- `main`: baseline + PR #1 (`474404b`) + PR #2 (`d1db77e`) + PR #3 (`2a3938b`); contiene ranking y `netlify.toml`.
 - `feature/db-schema`: esquema inicial; PR #1 mergeado después de verificar insert/RLS. Rama remota eliminada.
 - `feature/ranking-global`: nombre, envío de campañas y tarjeta de ranking; PR #2 mergeado (`d1db77e`): <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>.
-- `feature/netlify-deploy`: `netlify.toml` (build vacío, publish `.`) y pasos en README; PR pendiente de crear.
+- `feature/netlify-deploy`: `netlify.toml` (build vacío, publish `.`) y pasos en README; PR #3 mergeado (`2a3938b`): <https://github.com/Luis-Alejandro-18/Don_kiko/pull/3>.
 - Netlify: no hay CLI ni Node en este equipo; falta conectar la cuenta y verificar el sitio HTTPS.
 - No se debe subir la `service_role` key; la publishable/`anon key` es pública y la protege RLS.
 
@@ -134,7 +134,7 @@ Estado tras la revisión inicial y la fase 2 (2026-11-05).
 - Filas de prueba pendientes de borrar en Supabase (SQL Editor):
   `delete from public.runs where client_run_id = 'anon-rls-test-1' or player_name in ('Prueba E2E', 'Prueba Won', 'Prueba Won 2');`
 - Actualizados `AGENT.md`, `README.md`, `db/README.md` y este archivo. PR #2 mergeado en `main` (`d1db77e`): <https://github.com/Luis-Alejandro-18/Don_kiko/pull/2>.
-- Fase 3 preparada: `netlify.toml` con build vacío y publish `.`, y sección de despliegue en README. No hay Netlify CLI ni Node en el equipo; falta conectar la cuenta del usuario y verificar la URL HTTPS.
+- Fase 3 preparada: `netlify.toml` con build vacío y publish `.`, y sección de despliegue en README; PR #3 mergeado (`2a3938b`). No hay Netlify CLI ni Node en el equipo; falta conectar la cuenta del usuario y verificar la URL HTTPS.
 
 ## 7. Backlog
 
