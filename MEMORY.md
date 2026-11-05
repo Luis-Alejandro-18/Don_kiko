@@ -1,15 +1,17 @@
 # MEMORY.md — Memoria del proyecto
 
 > Contexto persistente para agentes. `AGENT.md` = reglas (≤ 80 líneas); este archivo = hechos, decisiones y estado.
-> Última actualización: 2026-11-03
+> Última actualización: 2026-11-04
 
 ## 1. Contexto
 
-- Panel web offline para jugar **Don Kiko: la aventura completa (3 niveles, v2.1)** y ver telemetría, KPIs e historial.
-- Stack: HTML + CSS + JavaScript vanilla, canvas 2D. Sin dependencias, sin build, sin red.
+- Panel web para jugar **Don Kiko: la aventura completa (3 niveles, v2.1)**, ver telemetría, KPIs, historial y (en fase 2) un ranking global.
+- Stack: HTML + CSS + JavaScript vanilla, canvas 2D. Sin dependencias ni build en el frontend.
+- El modo local funciona sin red; el ranking global usa **Supabase** (Postgres + REST).
 - El juego vive en `game/don_kiko.html`; el panel en `index.html` + `js/dashboard.js` + `js/charts.js`.
 - El archivo original `../don_kiko_3_niveles_v2_1.html` **no está en la carpeta**; este proyecto incluye su copia con telemetría.
 - Se abre con doble clic (`file://`) o con un servidor local (`python -m http.server 8000`).
+- Repositorio: <https://github.com/Luis-Alejandro-18/Don_kiko>.
 
 ## 2. Decisiones
 
@@ -19,6 +21,12 @@
 | 2026-11-03 | Sin frameworks, CDN ni build | Simplicidad y funcionamiento con `file://` |
 | 2026-11-03 | Móvil como alcance secundario | El panel oculta los controles táctiles del embed |
 | 2026-11-03 | Mantener `postMessage` como contrato panel ↔ juego | Ya funciona con `file://` y no requiere servidor |
+| 2026-11-04 | Repo GitHub `Luis-Alejandro-18/Don_kiko`; `main` estable y ramas feature | Versionado, revisión y deploy |
+| 2026-11-04 | Supabase (Postgres + REST) para el ranking | Base compartida sin backend propio |
+| 2026-11-04 | Identidad por `player_name` en el MVP | Simplicidad; cuentas/Auth en otra fase |
+| 2026-11-04 | Ranking de campaña (`start_stage = 1`) | Evitar que las pruebas de nivel 2/3 inflen el ranking |
+| 2026-11-04 | RLS: `anon` solo lee e inserta | Evitar ediciones/borrados desde el cliente |
+| 2026-11-04 | Cliente directo a Supabase REST; Functions opcional | Menos piezas; se puede endurecer después |
 
 ## 3. Arquitectura
 
@@ -26,6 +34,17 @@
 - `js/charts.js`: expone `window.DKCharts` con `scores`, `results`, `hurts`, `funnel`; dibuja en canvas sin librerías.
 - `game/don_kiko.html`: juego autocontenido; emite telemetría cada 250 ms y en eventos; con `?embed=1` oculta el marco y los controles táctiles.
 - El panel envía comandos al iframe con `postMessage`; el juego solo los acepta si `source === 'dashboard'`.
+- `db/schema.sql`: tabla `runs`, vista `leaderboard`, índices y RLS para Supabase.
+- `db/README.md`: pasos para crear el proyecto, ejecutar el esquema y probar RLS.
+
+## 3.1 GitHub y despliegue
+
+- Repo: <https://github.com/Luis-Alejandro-18/Don_kiko>.
+- `main`: baseline del dashboard local (commit `70af080`).
+- `feature/db-schema`: esquema inicial de Supabase; se integra cuando el SQL esté probado.
+- `feature/ranking-global`: pendiente (nombre, envío de partidas y tarjeta de ranking).
+- Netlify: pendiente de conectar el repo; build vacío y publish `.`.
+- No se debe subir la `service_role` key; la `anon key` es pública y la protege RLS.
 
 ## 4. Contrato de datos
 
@@ -36,6 +55,9 @@
 - Metas por nivel: `goalX` = 799 / 1453 / 2345; el juego las envía en cada snapshot.
 - `snapshot` incluye además `floor`, `friendX`, `pauActive`, `pauX`, `objects`, `elapsed`, `levelName`, `muted`.
 - Comandos: `start {level}`, `continue`, `toggle`, `pause`, `resume`, `restart`, `mute {value}`, `status`.
+- Supabase `runs`: `id`, `client_run_id` (único), `player_name`, `score`, `result`, `start_stage`, `stage_reached`, `duration_ms`, `active_time_ms`, `levels` (JSONB), `created_at`.
+- Vista `leaderboard`: `player_name`, `best_score`, `best_stage`, `best_time_ms`, `runs`, `last_played`.
+- La vista filtra `start_stage = 1` y `result <> 'abandoned'`; las pruebas de nivel 2/3 quedan fuera del ranking de campaña.
 
 ## 5. Estado de bugs
 
@@ -70,6 +92,16 @@ Estado tras la revisión y las correcciones del 2026-11-03.
   - Panel: botón **Continuar** y estados de Pausa/Continuar; persistencia cada 3 s; guardado en `pagehide`/`visibilitychange`; `lastSeenAt`; validación/escape del id importado; verificación de `postMessage`; orden por fecha; `startStage` y etiqueta **prueba**; lecturas de JuanMa/progreso; log y sonido sincronizados; mejoras de accesibilidad.
   - README actualizado con Enter, comandos, estructura y formato.
 
+### 2026-11-04
+
+- Creado el repositorio `Luis-Alejandro-18/Don_kiko` y subido el baseline a `main` (commit `70af080`).
+- Añadidos `.gitignore` y `.gitattributes`; se usa el correo noreply de GitHub para no publicar el correo de la universidad.
+- Creada la rama `feature/db-schema` con:
+  - `db/schema.sql`: `runs`, índices, RLS, vista `leaderboard` de campaña.
+  - `db/README.md`: creación de Supabase, ejecución del SQL, pruebas y RLS.
+- Actualizados `AGENT.md`, `MEMORY.md` y `README.md`.
+- Pendiente: crear el proyecto en Supabase y ejecutar `db/schema.sql` (requiere la cuenta del usuario).
+
 ## 7. Backlog
 
 - B6: decidir si "Mejor nivel" debe excluir las partidas de prueba.
@@ -79,6 +111,10 @@ Estado tras la revisión y las correcciones del 2026-11-03.
 - Móvil: decidir entre controles táctiles dentro del panel o mantener "Abrir juego" como flujo aparte.
 - Probar un nivel completo para validar el intermission real.
 - Probar Edge y Firefox.
+- Fase 2: integrar el ranking en el panel (nombre, envío y tarjeta global).
+- Crear el proyecto Supabase, ejecutar `db/schema.sql` y probar RLS con `anon`.
+- Conectar Netlify al repo (`main`, build vacío, publish `.`).
+- Evaluar después: ranking por nivel/tiempo, gráficas globales, Auth y Functions.
 
 ## 8. Verificación
 
@@ -97,3 +133,11 @@ Pendiente de verificar manualmente:
 - [ ] Exportar e importar desde la interfaz.
 - [ ] Edge, Firefox y servidor local (`http://localhost`).
 - [ ] Comportamiento en móvil.
+
+### Fase 1 (Supabase)
+
+- [ ] Proyecto creado y `db/schema.sql` ejecutado sin errores.
+- [ ] Insert de prueba y `select * from leaderboard` devuelven datos.
+- [ ] `anon` puede insertar/leer, pero no actualizar ni borrar.
+- [ ] Partida de prueba eliminada.
+- [ ] Netlify conectado al repo y sitio estático desplegado.
