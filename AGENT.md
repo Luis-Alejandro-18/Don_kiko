@@ -23,6 +23,7 @@ HTML/CSS/JS sin dependencias ni build. El modo local funciona sin red; el rankin
 - `game/don_kiko.html`: juego + puente `postMessage` (`?embed=1`).
 - `db/schema.sql`: tablas, vista y RLS del ranking.
 - `db/README.md`: pasos para crear y probar Supabase.
+- `netlify.toml`: despliegue estático (publish `.`, sin build).
 - `README.md`: uso · `MEMORY.md`: decisiones y estado.
 
 ## Contrato postMessage

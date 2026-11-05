@@ -62,6 +62,18 @@ El historial local se guarda en `localStorage` con la clave `donkiko_dashboard_r
 
 Si el navegador bloquea `localStorage` para archivos locales, aparece un aviso y el historial dura solo la sesión; exporta antes de cerrar.
 
+## Publicar en Netlify
+
+El repositorio incluye `netlify.toml` con build vacío y publish en la raíz:
+
+1. En Netlify, elige **Add new site → Import an existing project** y conecta el repositorio.
+2. Rama de producción: `main`. Build command: vacío. Publish directory: `.`.
+3. Despliega y abre la URL HTTPS. El panel y el ranking funcionan igual que en local.
+4. Netlify publica también `AGENT.md`, `MEMORY.md` y `db/`; son documentos públicos y no contienen secretos. La publishable key de `js/config.js` ya es pública.
+5. Si cambias la URL o la clave de Supabase, edita `js/config.js` y vuelve a desplegar.
+
+No hay Node ni paso de build: Netlify solo sirve archivos estáticos.
+
 ## Estructura
 
 ```
@@ -74,6 +86,7 @@ don_kiko_dashboard/
 ├─ game/don_kiko.html  Copia del juego con telemetría
 ├─ db/schema.sql       Esquema del ranking (Supabase)
 ├─ db/README.md        Instrucciones de Supabase
+├─ netlify.toml        Configuración de despliegue estático
 ├─ AGENT.md            Reglas para agentes (≤ 80 líneas)
 ├─ MEMORY.md           Decisiones, bugs y estado del proyecto
 └─ README.md
