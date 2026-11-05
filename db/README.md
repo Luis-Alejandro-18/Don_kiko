@@ -55,7 +55,20 @@ está diseñada para ser pública; la protección real está en RLS.
 
 ## 5. Probar RLS
 
-Con la `anon key`, un `DELETE` o un `UPDATE` debe fallar o afectar a 0 filas:
+Con la `anon key`, un `DELETE` o un `UPDATE` debe fallar o afectar a 0 filas.
+En PowerShell:
+
+```powershell
+$headers = @{
+  apikey = $env:SUPABASE_ANON_KEY
+  Authorization = "Bearer $env:SUPABASE_ANON_KEY"
+}
+Invoke-RestMethod -Method Delete `
+  -Uri "$env:SUPABASE_URL/rest/v1/runs?client_run_id=eq.test-1" `
+  -Headers $headers
+```
+
+En Git Bash / curl:
 
 ```bash
 curl -X DELETE "$SUPABASE_URL/rest/v1/runs?client_run_id=eq.test-1" \
@@ -63,8 +76,9 @@ curl -X DELETE "$SUPABASE_URL/rest/v1/runs?client_run_id=eq.test-1" \
   -H "Authorization: Bearer $SUPABASE_ANON_KEY"
 ```
 
-Si quieres probar un insert como `anon`, usa la API REST con la misma clave y
-un `client_run_id` nuevo. El `insert` debe funcionar; el `delete` no.
+Si devuelve 401/403 o 0 filas, RLS está bloqueando correctamente. Para probar un
+insert como `anon`, usa la API REST con la misma clave y un `client_run_id`
+nuevo; el insert debe funcionar y el delete no.
 
 ## 6. Modelo de datos
 
