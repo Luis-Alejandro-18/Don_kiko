@@ -1,17 +1,59 @@
--- Don Kiko · Esquema inicial del ranking global (Supabase / PostgreSQL)
+-- Don Kiko · Esquema del ranking global con autenticación (Supabase / PostgreSQL)
 -- Ejecutar completo en Supabase → SQL Editor.
---
--- Identidad MVP: nombre del jugador.
+-- Fase 1: Registro de usuarios.
+
+-- Identidad: auth.users de Supabase Auth + public.profiles para alias público.
 -- Ranking de campaña: solo partidas iniciadas en el nivel 1 (`start_stage = 1`).
 -- Las partidas de prueba (nivel 2/3) no entran en ese ranking.
---
+
 -- Seguridad:
---   - `anon` y `authenticated` solo pueden leer e insertar.
---   - No hay políticas de UPDATE ni DELETE.
+--   - `anon` y `authenticated` solo pueden leer e insertar runs.
+--   - No hay políticas de UPDATE ni DELETE en runs.
 --   - La `service_role` key nunca debe usarse en el frontend.
 
 create extension if not exists pgcrypto;
 
+-- Tabla de perfiles públicos vinculada a auth.users de Supabase.
+create table if not exists public.profiles (
+  id uuid primary key references auth.users on delete cascade,
+  alias text not null unique,
+  created_at timestamptz not null default now(),
+  constraint profiles_alias_len check (char_length(btrim(alias)) between 1 and 24),
+  constraint profiles_alias_trimmed check (alias = btrim(alias))
+);
+
+alter table public.profiles enable row level security;
+
+-- Cualquiera puede leer los perfiles públicos (para mostrar alias en el ranking).
+drop policy if exists profiles_select_public on public.profiles;
+create policy profiles_select_public on public.profiles
+  for select
+  to anon, authenticated
+  using (true);
+
+-- Solo el usuario autenticado puede insertar/actualizar su propio perfil.
+drop policy if exists profiles_insert_own on public.profiles;
+create policy profiles_insert_own on public.profiles
+  for insert
+  to authenticated
+  with check (auth.uid() = id);
+
+drop policy if exists profiles_update_own on public.profiles;
+create policy profiles_update_own on public.profiles
+  for update
+  to authenticated
+  using (auth.uid() = id);
+
+drop policy if exists profiles_delete_own on public.profiles;
+create policy profiles_delete_own on public.profiles
+  for delete
+  to authenticated
+  using (auth.uid() = id);
+
+grant select on public.profiles to anon, authenticated;
+grant insert, update, delete on public.profiles to authenticated;
+
+-- Tabla de partidas con vinculación opcional a usuario autenticado.
 create table if not exists public.runs (
   id uuid primary key default gen_random_uuid(),
   client_run_id text not null unique,
@@ -39,10 +81,14 @@ create table if not exists public.runs (
   )
 );
 
+-- Agregar user_id a runs si la tabla ya existía (migración desde versión anterior).
+alter table public.runs add column if not exists user_id uuid references auth.users on delete set null;
+
 create index if not exists runs_created_at_idx on public.runs (created_at desc);
 create index if not exists runs_player_name_idx on public.runs (player_name);
 create index if not exists runs_score_idx on public.runs (score desc);
 create index if not exists runs_campaign_idx on public.runs (start_stage, score desc);
+create index if not exists runs_user_id_idx on public.runs (user_id);
 
 alter table public.runs enable row level security;
 
@@ -68,30 +114,34 @@ create policy runs_insert_public on public.runs
     and active_time_ms between 0 and 86400000
     and jsonb_typeof(levels) = 'array'
     and jsonb_array_length(levels) between 1 and 3
+    -- Si hay user_id, debe ser el del usuario autenticado.
+    and (user_id is null or auth.uid() = user_id)
   );
 
 -- El cliente no puede editar ni borrar partidas.
 revoke all on public.runs from anon, authenticated;
 grant select, insert on public.runs to anon, authenticated;
 
--- Ranking de campaña: mejor puntaje por jugador.
+-- Ranking de campaña: mejor puntaje por usuario autenticado o por nombre anónimo.
 -- `security_invoker` hace que se aplique la RLS de `runs` al consultar la vista.
 create or replace view public.leaderboard
 with (security_invoker = true)
 as
 select
-  player_name,
-  max(score) as best_score,
-  max(stage_reached) as best_stage,
-  min(active_time_ms) filter (
-    where result = 'won' and active_time_ms > 0
+  coalesce(p.alias, r.player_name) as player_name,
+  r.user_id,
+  max(r.score) as best_score,
+  max(r.stage_reached) as best_stage,
+  min(r.active_time_ms) filter (
+    where r.result = 'won' and r.active_time_ms > 0
   ) as best_time_ms,
   count(*)::integer as runs,
-  max(created_at) as last_played
-from public.runs
-where start_stage = 1
-  and result <> 'abandoned'
-group by player_name
+  max(r.created_at) as last_played
+from public.runs r
+left join public.profiles p on p.id = r.user_id
+where r.start_stage = 1
+  and r.result <> 'abandoned'
+group by r.user_id, p.alias, r.player_name
 order by best_score desc, best_time_ms asc nulls last, last_played asc;
 
 revoke all on public.leaderboard from anon, authenticated;

@@ -16,6 +16,14 @@
     </div>
     <div class="header-actions">
       <span class="badge" id="statusBadge" data-state="menu">Conectando…</span>
+      <div id="authUser" class="auth-user" hidden>
+        <span id="authUserAlias" class="auth-alias"></span>
+        <button id="authSignOutBtn" type="button" title="Cerrar sesión">Cerrar sesión</button>
+      </div>
+      <div id="authGuest" class="auth-guest">
+        <button id="authSignInBtn" type="button" title="Iniciar sesión">Iniciar sesión</button>
+        <button id="authSignUpBtn" type="button" title="Crear cuenta">Registrarse</button>
+      </div>
       <button id="openGameBtn" title="Abrir el juego en una pestaña nueva">Abrir juego</button>
       <button id="exportBtn" title="Descargar el historial en JSON">Exportar</button>
       <label class="file-btn" title="Cargar un historial JSON">Importar<input type="file" id="importInput" accept="application/json,.json"></label>
@@ -159,6 +167,39 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
+<!-- Panel de autenticación (login / registro) -->
+<section id="authPanel" class="card auth-panel" hidden aria-label="Autenticación">
+  <div class="auth-head">
+    <h3 id="authTitle">Iniciar sesión</h3>
+    <button id="authCloseBtn" type="button" title="Cerrar">✕</button>
+  </div>
+  <form id="authForm">
+    <div class="auth-fields">
+      <div class="auth-field" id="authFieldEmail" style="display:none">
+        <label>Correo electrónico</label>
+        <input id="authEmail" type="email" required autocomplete="email" placeholder="tú@ejemplo.com">
+      </div>
+      <div class="auth-field" id="authFieldAlias" style="display:none">
+        <label>Tu alias (público en el ranking)</label>
+        <input id="authAlias" type="text" maxlength="24" required autocomplete="nickname" placeholder="Tu alias" title="1 a 24 caracteres">
+      </div>
+      <div class="auth-field">
+        <label>Contraseña</label>
+        <input id="authPassword" type="password" required autocomplete="new-password" placeholder="••••••••" title="Mínimo 6 caracteres">
+      </div>
+      <div class="auth-field" id="authFieldConfirm" style="display:none">
+        <label>Confirma tu contraseña</label>
+        <input id="authPasswordConfirm" type="password" required autocomplete="new-password" placeholder="••••••••">
+      </div>
+    </div>
+    <p id="authHint" class="auth-hint"></p>
+    <button id="authSubmitBtn" type="submit">Iniciar sesión</button>
+    <button id="authToggleBtn" type="button">¿No tienes cuenta? Regístrate</button>
+  </form>
+  <p id="authError" class="auth-error" hidden></p>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/dashboard.js"></script>
