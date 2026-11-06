@@ -214,7 +214,7 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `css/styles.css`: estilos para panel de autenticación y usuario conectado.
 - [x] `submitRun()` requiere autenticación e incluye `user_id` en el payload.
 - [x] `currentPlayerNameForRanking()` usa el alias del perfil si hay sesión.
-- [x] PR `feature/auth-users` creado: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/4>.
+- [x] PR `feature/auth-users` abierto: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/4>.
 - [ ] Pendiente: ejecutar `db/schema.sql` en Supabase SQL Editor (migración).
 - [ ] Pendiente: habilitar Auth (email/password) en Supabase → Authentication.
 - [ ] Pendiente: probar registro, login, logout y envío al ranking desde cuenta autenticada.
