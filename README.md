@@ -40,16 +40,28 @@ También puedes usar los botones **Nivel 1/2/3**, **Continuar**, **Pausa**, **Re
 - **Historial**: fecha, nivel, puntos, vidas, duración, resultado y causa. Se puede filtrar, borrar una partida o todo el historial.
 - **Ranking global**: el mejor puntaje de cada jugador en campañas desde el **Nivel 1**, con nivel alcanzado, mejor tiempo de victoria, partidas y última fecha. Se actualiza al terminar una partida o con el botón **Actualizar**.
 
-## Ranking global
+## Registro de usuarios y ranking global
 
 El ranking se guarda en Supabase y se comparte entre jugadores. La base está definida en [`db/schema.sql`](db/schema.sql) y las instrucciones para crear el proyecto en Supabase están en [`db/README.md`](db/README.md).
 
-- Escribe tu nombre en **Tu nombre**, dentro de la tarjeta **Ranking global**. Se guarda en este navegador (`donkiko_dashboard_player_v1`).
-- Al terminar una campaña iniciada en el **Nivel 1** se envían el nombre, puntaje, resultado, niveles y tiempos.
+### Registro de usuarios (obligatorio para el ranking)
+
+Para aparecer en el ranking global debes registrarte con correo y contraseña:
+
+1. Haz clic en **Registrarse** en la parte superior del panel.
+2. Ingresa tu correo, contraseña (mínimo 6 caracteres) y un alias público (1–24 caracteres).
+3. Haz clic en **Registrarse**. Tu cuenta queda vinculada a Supabase Auth.
+4. Para iniciar sesión después, usa **Iniciar sesión** con tu correo y contraseña.
+5. Usa **Cerrar sesión** cuando quieras salir.
+
+### Cómo funciona el ranking
+
+- Al terminar una campaña iniciada en el **Nivel 1** con sesión iniciada, se envían tu alias, puntaje, resultado, niveles y tiempos.
 - Solo cuentan partidas terminadas (`won`, `game_over`, `pau_caught`). Las pruebas de **Nivel 2/3** y las abandonadas quedan solo en el historial local.
 - Orden: mejor puntaje; desempate: mejor tiempo de victoria; luego la última partida.
-- El historial local sigue funcionando sin Internet; el ranking necesita conexión. Si `file://` funciona en tu Chrome, el ranking también; si el navegador bloquea la red, abre el panel desde Netlify o `http://localhost`.
-- Los nombres son públicos: usa un alias, no tu nombre completo. Si cambias el nombre, tus marcas anteriores quedan con el nombre anterior. Si dos jugadores usan el mismo nombre, sus marcas se agrupan.
+- El historial local sigue funcionando sin Internet y sin cuenta; el ranking necesita conexión y cuenta activa.
+- Si `file://` funciona en tu Chrome, el ranking también; si el navegador bloquea la red, abre el panel desde Netlify o `http://localhost`.
+- Los aliases son públicos: usa un alias, no tu nombre completo.
 - La publishable key está en `js/config.js`; es pública. Nunca se usa la `service_role` en el frontend.
 
 ## Guardado y respaldo
