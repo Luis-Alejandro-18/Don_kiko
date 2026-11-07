@@ -397,11 +397,7 @@
     });
     if (error) throw error;
     if (data.user) {
-      // Crear perfil público vinculado al usuario
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({ id: data.user.id, alias });
-      if (profileError) throw profileError;
+      // El trigger on_auth_user_created crea el perfil automáticamente.
       state.auth.user = data.user;
       state.auth.profile = { alias };
     }

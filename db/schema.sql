@@ -53,6 +53,20 @@ create policy profiles_delete_own on public.profiles
 grant select on public.profiles to anon, authenticated;
 grant insert, update, delete on public.profiles to authenticated;
 
+-- Trigger automático: crea el perfil público cuando un usuario se registra en auth.users.
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, alias)
+  values (new.id, new.raw_user_meta_data->>'alias');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
 -- Tabla de partidas con vinculación opcional a usuario autenticado.
 create table if not exists public.runs (
   id uuid primary key default gen_random_uuid(),
