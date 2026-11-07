@@ -214,6 +214,7 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `css/styles.css`: estilos para panel de autenticación y usuario conectado.
 - [x] `submitRun()` requiere autenticación e incluye `user_id` en el payload.
 - [x] Fix: `window.supabase` (no `supabaseClient`) para inicializar el cliente Auth; PR #5 mergeado (`c640f35`).
+- [x] Fix: trigger `on_auth_user_created` en `auth.users` crea automáticamente el perfil en `public.profiles`; PR #6 mergeado (`f67b3c4`).
 - [x] `currentPlayerNameForRanking()` usa el alias del perfil si hay sesión.
 - [x] PR `feature/auth-users` abierto: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/4>.
 - [ ] Pendiente: ejecutar `db/schema.sql` en Supabase SQL Editor (migración).
