@@ -39,8 +39,9 @@ Panel → juego (`source: 'dashboard'`):
 - Esquema en `db/schema.sql`; ejecutarlo en Supabase SQL Editor.
 - `runs` guarda partidas; `leaderboard` es la vista de campaña (`start_stage = 1`).
 - RLS: `anon` solo lee e inserta; nunca `service_role` en el frontend.
-- Identidad MVP: `player_name` (1–24, `localStorage: donkiko_dashboard_player_v1`); sin cuentas.
+- Identidad: `player_name` anónimo o `user_id` + `alias` de Supabase Auth (email/password).
 - El panel envía solo campañas terminadas (`won`, `game_over`, `pau_caught`) y lee `leaderboard`; pruebas de nivel 2/3 y abandonadas quedan locales.
+- `submitRun` requiere autenticación para aparecer en el ranking global; modo local sigue sin cuenta.
 - `active_time_ms` = suma de niveles; orden por puntaje y mejor tiempo de victoria como desempate.
 - `file://` se probó en Chrome; si un navegador bloquea la red, usar Netlify o `http://localhost`; el modo local no depende del ranking.
 
@@ -58,9 +59,11 @@ Panel → juego (`source: 'dashboard'`):
 - [ ] Al completar un nivel, "Siguiente nivel" avanza desde el panel.
 - [ ] Cerrar a mitad de nivel y verificar puntos guardados al reabrir.
 - [ ] Exportar, borrar e importar el JSON.
-- [ ] `db/schema.sql` ejecutado en Supabase; `select * from leaderboard` responde.
+- [ ] `db/schema.sql` ejecutado en Supabase (migración: `profiles`, `user_id`, `leaderboard`).
+- [ ] Supabase Auth (email/password) habilitado en Authentication.
 - [ ] Nombre guardado en localStorage y resaltado en el ranking.
-- [ ] Partida de campaña enviada; el ranking se actualiza sin recargar.
+- [ ] Registro/login/cierre de sesión funcionan; alias se muestra en cabecera.
+- [ ] Partida de campaña enviada con cuenta autenticada; el ranking se actualiza.
 - [ ] Ranking con estados de carga, vacío, error y actualización manual.
 - [ ] Sin errores en la consola del panel ni del iframe.
 

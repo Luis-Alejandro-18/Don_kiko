@@ -36,6 +36,11 @@
     connected: false,
     storageOk: true,
     playerName: '',
+    auth: {
+      user: null,
+      profile: null,
+      loading: false
+    },
     ranking: {
       rows: [],
       loading: false,
@@ -90,6 +95,10 @@
   const rankingKey = String(rankingConfig.supabaseKey || '');
   const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
   const rankingEnabled = !!(rankingUrl && rankingKey);
+
+  const supabase = window.supabaseClient
+    ? window.supabaseClient.createClient(rankingUrl, rankingKey)
+    : null;
 
   function normalizeName(value) {
     return Array.from(String(value || '').trim()).slice(0, 24).join('');
@@ -244,11 +253,19 @@
     if (!['won', 'game_over', 'pau_caught'].includes(run.result)) return;
     if (!rankingEnabled) return;
 
-    const playerName = currentPlayerName();
+    if (!isAuthenticated()) {
+      if (!nameHintShown) {
+        nameHintShown = true;
+        toast('Inicia sesión para enviar tu puntaje al ranking global.');
+      }
+      return;
+    }
+
+    const playerName = currentPlayerNameForRanking();
     if (!playerName) {
       if (!nameHintShown) {
         nameHintShown = true;
-        toast('Puntaje guardado localmente. Escribe tu nombre en Ranking global para enviarlo.');
+        toast('Tu perfil no tiene alias asignado.');
       }
       return;
     }
@@ -267,6 +284,7 @@
     const activeTime = levels.reduce((total, lv) => total + lv.timeMs, 0);
     const payload = {
       client_run_id: String(run.id).slice(0, 64),
+      user_id: state.auth.user ? state.auth.user.id : null,
       player_name: playerName,
       score: clamp(Math.round(Number(run.score) || 0), 0, 100000000),
       result: run.result,
@@ -305,6 +323,144 @@
       console.warn('Ranking global (envío):', err);
       toast('No se pudo enviar el puntaje; quedó guardado en el historial local.');
     }
+  }
+
+  /* ---------- Autenticación (Supabase Auth) ---------- */
+  function isAuthenticated() {
+    return !!(state.auth.user && supabase);
+  }
+
+  async function loadProfile(userId) {
+    if (!supabase || !userId) return null;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('alias')
+        .eq('id', userId)
+        .single();
+      if (error) return null;
+      return data;
+    } catch (e) {
+      console.warn('Perfil:', e);
+      return null;
+    }
+  }
+
+  async function initAuth() {
+    if (!supabase) {
+      state.auth.loading = false;
+      updateAuthUI();
+      return;
+    }
+    state.auth.loading = true;
+    updateAuthUI();
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        state.auth.user = null;
+        state.auth.profile = null;
+      } else {
+        state.auth.user = user;
+        state.auth.profile = await loadProfile(user.id);
+      }
+    } catch (e) {
+      console.warn('Auth init:', e);
+      state.auth.user = null;
+      state.auth.profile = null;
+    } finally {
+      state.auth.loading = false;
+      updateAuthUI();
+    }
+  }
+
+  // Escuchar cambios de sesión (login/logout en otra pestaña, etc.)
+  function subscribeAuth() {
+    if (!supabase) return;
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        state.auth.user = session?.user ?? null;
+        state.auth.profile = session?.user ? await loadProfile(session.user.id) : null;
+      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        state.auth.user = null;
+        state.auth.profile = null;
+      }
+      updateAuthUI();
+    });
+  }
+
+  async function signUp(email, password, alias) {
+    if (!supabase) throw new Error('Supabase no disponible');
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { alias } }
+    });
+    if (error) throw error;
+    if (data.user) {
+      // Crear perfil público vinculado al usuario
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({ id: data.user.id, alias });
+      if (profileError) throw profileError;
+      state.auth.user = data.user;
+      state.auth.profile = { alias };
+    }
+    updateAuthUI();
+    return data;
+  }
+
+  async function signIn(email, password) {
+    if (!supabase) throw new Error('Supabase no disponible');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) {
+      state.auth.user = data.user;
+      state.auth.profile = await loadProfile(data.user.id);
+    }
+    updateAuthUI();
+    return data;
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    state.auth.user = null;
+    state.auth.profile = null;
+    updateAuthUI();
+  }
+
+  function updateAuthUI() {
+    const userEl = $('authUser');
+    const guestEl = $('authGuest');
+    const aliasEl = $('authUserAlias');
+    if (!userEl || !guestEl || !aliasEl) return;
+
+    if (isAuthenticated() && state.auth.profile) {
+      userEl.hidden = false;
+      guestEl.hidden = true;
+      aliasEl.textContent = state.auth.profile.alias || state.auth.user.email;
+    } else {
+      userEl.hidden = true;
+      guestEl.hidden = false;
+    }
+
+    // Si hay usuario autenticado, usar su alias como nombre para el ranking
+    const nameInput = $('playerName');
+    if (nameInput) {
+      if (isAuthenticated() && state.auth.profile) {
+        nameInput.value = state.auth.profile.alias;
+        nameInput.disabled = true;
+      } else {
+        nameInput.disabled = false;
+      }
+    }
+  }
+
+  function currentPlayerNameForRanking() {
+    if (isAuthenticated() && state.auth.profile) {
+      return state.auth.profile.alias;
+    }
+    return currentPlayerName();
   }
 
   /* ---------- Persistencia ---------- */
@@ -800,6 +956,104 @@
 
   $('refreshRankingBtn').addEventListener('click', loadRanking);
 
+  /* ---------- Autenticación: UI ---------- */
+  const authPanel = $('authPanel');
+  const authForm = $('authForm');
+  const authTitle = $('authTitle');
+  const authSubmitBtn = $('authSubmitBtn');
+  const authToggleBtn = $('authToggleBtn');
+  const authError = $('authError');
+  const authEmail = $('authEmail');
+  const authPassword = $('authPassword');
+  const authPasswordConfirm = $('authPasswordConfirm');
+  const authAlias = $('authAlias');
+  const authFieldEmail = $('authFieldEmail');
+  const authFieldAlias = $('authFieldAlias');
+  const authFieldConfirm = $('authFieldConfirm');
+  let authMode = 'login'; // 'login' | 'signup'
+
+  function showAuthPanel() {
+    if (!authPanel) return;
+    authPanel.hidden = false;
+    authError.hidden = true;
+    authError.textContent = '';
+    authForm.reset();
+    setAuthMode('login');
+  }
+
+  function hideAuthPanel() {
+    if (!authPanel) return;
+    authPanel.hidden = true;
+    authError.hidden = true;
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    if (!authTitle || !authSubmitBtn || !authToggleBtn) return;
+    if (mode === 'signup') {
+      authTitle.textContent = 'Crear cuenta';
+      authSubmitBtn.textContent = 'Registrarse';
+      authToggleBtn.textContent = '¿Ya tienes cuenta? Inicia sesión';
+      if (authFieldEmail) authFieldEmail.style.display = '';
+      if (authFieldAlias) authFieldAlias.style.display = '';
+      if (authFieldConfirm) authFieldConfirm.style.display = '';
+      authPassword.setAttribute('autocomplete', 'new-password');
+    } else {
+      authTitle.textContent = 'Iniciar sesión';
+      authSubmitBtn.textContent = 'Iniciar sesión';
+      authToggleBtn.textContent = '¿No tienes cuenta? Regístrate';
+      if (authFieldEmail) authFieldEmail.style.display = '';
+      if (authFieldAlias) authFieldAlias.style.display = 'none';
+      if (authFieldConfirm) authFieldConfirm.style.display = 'none';
+      authPassword.setAttribute('autocomplete', 'current-password');
+    }
+  }
+
+  if ($('authSignInBtn')) $('authSignInBtn').addEventListener('click', showAuthPanel);
+  if ($('authSignUpBtn')) $('authSignUpBtn').addEventListener('click', () => { showAuthPanel(); setAuthMode('signup'); });
+  if ($('authCloseBtn')) $('authCloseBtn').addEventListener('click', hideAuthPanel);
+  if (authToggleBtn) authToggleBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+
+  if (authForm) {
+    authForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      if (!supabase) {
+        authError.hidden = false;
+        authError.textContent = 'Supabase no está configurado.';
+        return;
+      }
+      const email = authEmail ? authEmail.value.trim() : '';
+      const password = authPassword ? authPassword.value : '';
+      const alias = authAlias ? authAlias.value.trim() : '';
+      authError.hidden = true;
+      authSubmitBtn.disabled = true;
+      try {
+        if (authMode === 'signup') {
+          if (!alias) throw new Error('El alias es obligatorio');
+          if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
+          if (authPasswordConfirm && authPasswordConfirm.value !== password) throw new Error('Las contraseñas no coinciden');
+          await signUp(email, password, alias);
+          toast('Cuenta creada. Ya puedes aparecer en el ranking.');
+        } else {
+          await signIn(email, password);
+          toast('Sesión iniciada.');
+        }
+        hideAuthPanel();
+      } catch (err) {
+        authError.hidden = false;
+        authError.textContent = err.message || 'Error de autenticación';
+        console.warn('Auth error:', err);
+      } finally {
+        authSubmitBtn.disabled = false;
+      }
+    });
+  }
+
+  if ($('authSignOutBtn')) $('authSignOutBtn').addEventListener('click', async () => {
+    await signOut();
+    toast('Sesión cerrada');
+  });
+
   $('filterResult').addEventListener('change', renderTable);
 
   $('exportBtn').addEventListener('click', () => {
@@ -895,6 +1149,8 @@
   loadRuns();
   renderLog();
   renderAll();
+  initAuth();
+  subscribeAuth();
   loadRanking();
   window.addEventListener('message', handleGameMessage);
   window.addEventListener('pagehide', persistNow);

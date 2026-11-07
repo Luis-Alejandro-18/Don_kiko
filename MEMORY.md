@@ -1,14 +1,17 @@
 # MEMORY.md — Memoria del proyecto
 
 > Contexto persistente para agentes. `AGENT.md` = reglas (≤ 80 líneas); este archivo = hechos, decisiones y estado.
-> Última actualización: 2026-11-05
+> Última actualización: 2026-11-06
 
 ## 1. Contexto
 
-- Panel web para jugar **Don Kiko: la aventura completa (3 niveles, v2.1)**, ver telemetría, KPIs, historial y un ranking global compartido.
-- Stack: HTML + CSS + JavaScript vanilla, canvas 2D. Sin dependencias ni build en el frontend.
-- El modo local funciona sin red; el ranking global usa **Supabase** (Postgres + REST).
+- Panel web para jugar **Don Kiko: la aventura completa (3 niveles, v2.1)**, ver telemetría, KPIs, historial y un ranking global compartido con autenticación de usuarios.
+- Stack: HTML + CSS + JavaScript vanilla, canvas 2D. Sin dependencias ni build en el frontend (Supabase JS client vía CDN para Auth).
+- El modo local funciona sin red; el ranking global usa **Supabase** (Postgres + REST + Auth).
 - El juego vive en `game/don_kiko.html`; el panel en `index.html` + `js/config.js` + `js/dashboard.js` + `js/charts.js`.
+- El archivo original `../don_kiko_3_niveles_v2_1.html` **no está en la carpeta**; este proyecto incluye su copia con telemetría.
+- Se abre con doble clic (`file://`) o con un servidor local (`python -m http.server 8000`).
+- Repositorio: <https://github.com/Luis-Alejandro-18/Don_kiko>.
 - El archivo original `../don_kiko_3_niveles_v2_1.html` **no está en la carpeta**; este proyecto incluye su copia con telemetría.
 - Se abre con doble clic (`file://`) o con un servidor local (`python -m http.server 8000`).
 - Repositorio: <https://github.com/Luis-Alejandro-18/Don_kiko>.
@@ -28,6 +31,9 @@
 | 2026-11-04 | RLS: `anon` solo lee e inserta | Evitar ediciones/borrados desde el cliente |
 | 2026-11-04 | Cliente directo a Supabase REST; Functions opcional | Menos piezas; se puede endurecer después |
 | 2026-11-05 | URL y publishable key en `js/config.js` | La clave es pública y RLS protege la escritura |
+| 2026-11-06 | Registro de usuarios con Supabase Auth (email/password) | Evitar suplantación de nombres en el ranking |
+| 2026-11-06 | Ranking solo para usuarios autenticados | Modo local sigue disponible sin cuenta |
+| 2026-11-06 | Tabla `public.profiles` vinculada a `auth.users` | Alias público único por usuario |
 | 2026-11-05 | Enviar solo campañas terminadas desde Nivel 1 | Evitar pruebas de nivel y abandonadas en el ranking |
 | 2026-11-05 | Ranking top 50: puntaje, mejor tiempo de victoria y última partida | Orden claro y consulta simple |
 | 2026-11-05 | No crear niveles desde snapshots fuera de `playing` | Evitar niveles fantasma en menú/intermission |
@@ -36,13 +42,14 @@
 ## 3. Arquitectura
 
 - `js/config.js`: `window.DK_CONFIG` con `supabaseUrl`, `supabaseKey` (publishable) y `leaderboardLimit`.
-- `js/dashboard.js`: IIFE con estado en memoria (`state.runs`, `state.current`, `state.snap`, `state.ranking`, `state.playerName`), persistencia en `localStorage`, KPIs, historial, ranking, import/export y comandos.
+- `js/dashboard.js`: IIFE con estado en memoria (`state.runs`, `state.current`, `state.snap`, `state.ranking`, `state.playerName`, `state.auth`), persistencia en `localStorage`, KPIs, historial, ranking, import/export, comandos y autenticación.
 - `js/charts.js`: expone `window.DKCharts` con `scores`, `results`, `hurts`, `funnel`; dibuja en canvas sin librerías.
 - `game/don_kiko.html`: juego autocontenido; emite telemetría cada 250 ms y en eventos; con `?embed=1` oculta el marco y los controles táctiles.
 - El panel envía comandos al iframe con `postMessage`; el juego solo los acepta si `source === 'dashboard'`.
-- `db/schema.sql`: tabla `runs`, vista `leaderboard`, índices y RLS para Supabase.
+- `db/schema.sql`: tabla `runs`, tabla `profiles`, vista `leaderboard`, índices y RLS para Supabase.
 - `db/README.md`: pasos para crear el proyecto, ejecutar el esquema y probar RLS.
 - Ranking: `loadRanking()` consulta `GET /rest/v1/leaderboard` con `fetch` y timeout de 9 s; `submitRun()` hace `POST /rest/v1/runs` al terminar una campaña. La tarjeta muestra carga, vacío, error, actualización manual y resaltado del jugador actual.
+- Autenticación: `initAuth()` verifica sesión al cargar; `signUp`/`signIn`/`signOut` gestionan cuenta de Supabase Auth; `submitRun` requiere autenticación e incluye `user_id`; el ranking solo muestra partidas de usuarios registrados.
 
 ## 3.1 GitHub y despliegue
 
@@ -63,14 +70,15 @@
 - Metas por nivel: `goalX` = 799 / 1453 / 2345; el juego las envía en cada snapshot.
 - `snapshot` incluye además `floor`, `friendX`, `pauActive`, `pauX`, `objects`, `elapsed`, `levelName`, `muted`.
 - Comandos: `start {level}`, `continue`, `toggle`, `pause`, `resume`, `restart`, `mute {value}`, `status`.
-- Supabase `runs`: `id`, `client_run_id` (único), `player_name`, `score`, `result`, `start_stage`, `stage_reached`, `duration_ms`, `active_time_ms`, `levels` (JSONB), `created_at`.
-- Vista `leaderboard`: `player_name`, `best_score`, `best_stage`, `best_time_ms`, `runs`, `last_played`.
+- Supabase `runs`: `id`, `client_run_id` (único), `user_id` (ref a auth.users, nullable), `player_name`, `score`, `result`, `start_stage`, `stage_reached`, `duration_ms`, `active_time_ms`, `levels` (JSONB), `created_at`.
+- Supabase `profiles`: `id` (ref a auth.users), `alias` (único, 1–24), `created_at`.
+- Vista `leaderboard`: `player_name`, `user_id`, `best_score`, `best_stage`, `best_time_ms`, `runs`, `last_played`.
 - La vista filtra `start_stage = 1` y `result <> 'abandoned'`; las pruebas de nivel 2/3 quedan fuera del ranking de campaña.
-- Envío del panel: solo `startStage === 1` y resultado `won`/`game_over`/`pau_caught`; exige nombre, normaliza a 24 caracteres y arma `levels` con `stage`, `completed`, `timeMs`, `hurts`, `tokens`.
+- Envío del panel: solo `startStage === 1` y resultado `won`/`game_over`/`pau_caught`; **requiere autenticación**, incluye `user_id`, usa el alias del perfil como `player_name`.
 - `active_time_ms` = suma de `levels[].timeMs`; `duration_ms` es tiempo de pared. El cliente limita score/tiempos y usa `client_run_id` para idempotencia (409 = ya enviada).
 - Lectura: `GET /rest/v1/leaderboard?select=...&order=best_score.desc,best_time_ms.asc.nullslast,last_played.asc&limit=50`.
 - UI del ranking: estados `loading`, `ok`, `error`; vacío; botón **Actualizar**; refresco al enviar, al volver a la pestaña tras 30 s y al recuperar red; resalta el nombre actual.
-- Si no hay nombre, la partida queda local y se muestra un aviso una vez; no se encola para envío posterior.
+- Si no hay sesión iniciada, la partida queda local y se muestra un aviso; no se envía al ranking global.
 
 ## 5. Estado de bugs
 
@@ -149,7 +157,8 @@ Estado tras la revisión inicial y la fase 2 (2026-11-05).
 - Limpiar las filas de prueba de Supabase antes de compartir el ranking.
 - Conectar Netlify al repo (`main`, build vacío, publish `.`) y verificar HTTPS; `netlify.toml` ya está listo.
 - Probar estados de error/carga del ranking con red lenta o clave inválida.
-- Evaluar después: ranking por nivel/tiempo, gráficas globales, Auth, Functions y validación de puntajes en servidor.
+- Fase 2 (pendiente): encuesta de mejora del juego (tabla `survey_responses`, formulario en el panel, RLS).
+- Evaluar después: ranking por nivel/tiempo, gráficas globales, Functions y validación de puntajes en servidor.
 
 ## 8. Verificación
 
@@ -196,3 +205,16 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `netlify.toml` con build vacío y publish `.`; pasos en README.
 - [ ] Conectar la cuenta de Netlify al repo y desplegar `main`.
 - [ ] Verificar la URL HTTPS y el ranking desde el sitio desplegado.
+
+### Fase 4 (registro de usuarios) — 2026-11-06
+
+- [x] `db/schema.sql` actualizado: tabla `profiles`, columna `user_id` en `runs`, vista `leaderboard` con `user_id`, RLS para perfiles.
+- [x] `js/dashboard.js`: cliente Supabase Auth, `initAuth()`, `signUp()`, `signIn()`, `signOut()`, `updateAuthUI()`.
+- [x] `index.html`: paneles de login/registro/cerrar sesión en la cabecera.
+- [x] `css/styles.css`: estilos para panel de autenticación y usuario conectado.
+- [x] `submitRun()` requiere autenticación e incluye `user_id` en el payload.
+- [x] `currentPlayerNameForRanking()` usa el alias del perfil si hay sesión.
+- [x] PR `feature/auth-users` abierto: <https://github.com/Luis-Alejandro-18/Don_kiko/pull/4>.
+- [ ] Pendiente: ejecutar `db/schema.sql` en Supabase SQL Editor (migración).
+- [ ] Pendiente: habilitar Auth (email/password) en Supabase → Authentication.
+- [ ] Pendiente: probar registro, login, logout y envío al ranking desde cuenta autenticada.
