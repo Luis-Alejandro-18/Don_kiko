@@ -124,7 +124,9 @@ grant select, insert on public.runs to anon, authenticated;
 
 -- Ranking de campaña: mejor puntaje por usuario autenticado o por nombre anónimo.
 -- `security_invoker` hace que se aplique la RLS de `runs` al consultar la vista.
-create or replace view public.leaderboard
+drop view if exists public.leaderboard;
+
+create view public.leaderboard
 with (security_invoker = true)
 as
 select
