@@ -96,8 +96,8 @@
   const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
   const rankingEnabled = !!(rankingUrl && rankingKey);
 
-  const supabase = window.supabaseClient
-    ? window.supabaseClient.createClient(rankingUrl, rankingKey)
+  const supabase = window.supabase
+    ? window.supabase.createClient(rankingUrl, rankingKey)
     : null;
 
   function normalizeName(value) {
