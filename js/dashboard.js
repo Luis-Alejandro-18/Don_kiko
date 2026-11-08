@@ -330,7 +330,7 @@
     return !!(state.auth.user && supabase);
   }
 
-  async function loadProfile(userId) {
+  async function loadProfile(userId, email = '') {
     if (!supabase || !userId) return null;
     try {
       const { data, error } = await supabase
@@ -338,11 +338,23 @@
         .select('alias')
         .eq('id', userId)
         .single();
-      if (error) return null;
-      return data;
+      if (data) return data;
+      // Si no existe el perfil, crearlo automáticamente con alias derivado del email
+      const alias = email ? email.split('@')[0] : 'usuario';
+      const { data: inserted, error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: userId, alias })
+        .select('alias')
+        .single();
+      if (insertError) {
+        console.warn('No se pudo crear perfil:', insertError);
+        return { alias };
+      }
+      return inserted;
     } catch (e) {
       console.warn('Perfil:', e);
-      return null;
+      const alias = email ? email.split('@')[0] : 'usuario';
+      return { alias };
     }
   }
 
@@ -361,7 +373,7 @@
         state.auth.profile = null;
       } else {
         state.auth.user = user;
-        state.auth.profile = await loadProfile(user.id);
+        state.auth.profile = await loadProfile(user.id, user.email);
       }
     } catch (e) {
       console.warn('Auth init:', e);
@@ -379,7 +391,7 @@
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         state.auth.user = session?.user ?? null;
-        state.auth.profile = session?.user ? await loadProfile(session.user.id) : null;
+        state.auth.profile = session?.user ? await loadProfile(session.user.id, session.user.email) : null;
       } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         state.auth.user = null;
         state.auth.profile = null;
@@ -411,7 +423,7 @@
     if (error) throw error;
     if (data.user) {
       state.auth.user = data.user;
-      state.auth.profile = await loadProfile(data.user.id);
+      state.auth.profile = await loadProfile(data.user.id, data.user.email);
     }
     updateAuthUI();
     return data;
