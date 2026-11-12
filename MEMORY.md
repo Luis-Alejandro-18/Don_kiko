@@ -234,5 +234,11 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `loadProfile()` trunca el alias a 24 caracteres (`profiles_alias_len`) y usa `maybeSingle()`.
 - [x] Trigger `handle_new_user()` defensivo: alias del formulario o prefijo del correo, `on conflict do nothing`; `schema.sql` rellena perfiles faltantes de cuentas antiguas.
 - [ ] Requiere acción manual en Supabase: Authentication → Providers → Email → **Confirm email OFF**, y volver a ejecutar `schema.sql`.
-- [x] Verificado contra Supabase: `/auth/v1/settings` con `email: true` y `disable_signup: false`; `leaderboard` responde 200 con la consulta exacta del panel.
-- [ ] Pendiente: probar registro/login y envío de una campaña real desde el sitio desplegado.
+
+### Fase 6 (causa raíz de "los botones no hacen nada") — 2026-11-11
+
+- [x] Causa real: `index.html` no cargaba `js/config.js`, así que `window.DK_CONFIG` no existía y `createClient('','')` lanzaba `Uncaught Error: supabaseUrl is required` al inicio del IIFE. Se abortaba todo `dashboard.js`: sin listeners de botones, sin KPIs, sin historial y sin ranking. Los botones visibles eran HTML inerte.
+- [x] Fix `8888ed6`: `<script src="js/config.js">` antes de `charts.js`/`dashboard.js`, y `createClient` envuelto en `try/catch` para degradar a modo local si falta la configuración.
+- [x] `mailer_autoconfirm: true` confirmado en Supabase; registro devuelve sesión.
+- [x] Verificado con Chrome headless sobre el sitio desplegado: badge "Menú", ranking con 1 fila, modal de login/registro abre, login real deja el alias en la cabecera y la campaña desde Nivel 1 genera payload con `start_stage: 1` y `user_id`.
+- [ ] Limpiar datos de prueba: usuario `agente.prueba.mwcy13bd@example.com` y `delete from public.runs where client_run_id = 'test-agente-mwcy13bd';`.
