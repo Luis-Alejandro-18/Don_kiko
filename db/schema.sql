@@ -54,11 +54,20 @@ grant select on public.profiles to anon, authenticated;
 grant insert, update, delete on public.profiles to authenticated;
 
 -- Trigger automático: crea el perfil público cuando un usuario se registra en auth.users.
+-- Usa el alias que envía el formulario; si falta, cae al prefijo del correo (máx. 24).
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  v_alias text;
 begin
+  v_alias := nullif(btrim(coalesce(new.raw_user_meta_data->>'alias', '')), '');
+  if v_alias is null then
+    v_alias := nullif(btrim(split_part(coalesce(new.email, ''), '@', 1)), '');
+  end if;
+  v_alias := left(coalesce(v_alias, 'jugador'), 24);
   insert into public.profiles (id, alias)
-  values (new.id, new.raw_user_meta_data->>'alias');
+  values (new.id, v_alias)
+  on conflict (id) do nothing;
   return new;
 end;
 $$ language plpgsql security definer;
@@ -68,6 +77,15 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Relleno idempotente: crea perfiles para cuentas antiguas que no tienen fila.
+insert into public.profiles (id, alias)
+select
+  u.id,
+  coalesce(left(nullif(btrim(split_part(coalesce(u.email, ''), '@', 1)), ''), 24), 'jugador')
+from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id)
+on conflict (id) do nothing;
 
 -- Tabla de partidas con vinculación opcional a usuario autenticado.
 create table if not exists public.runs (

@@ -184,6 +184,67 @@ button.ghost{background:transparent;border-color:#42617d;color:#b9cfdf}
 button.ghost:hover{background:#163956}
 .modal-error{color:var(--red);font-size:11.5px;margin:8px 0 0}
 
+/* ---------- Ranking global ---------- */
+.ranking{overflow:hidden}
+.ranking-status{
+  display:flex;align-items:center;gap:7px;margin:0 0 10px;
+  font:700 11.5px ui-monospace,Consolas,monospace;letter-spacing:.04em;color:#9db6c8;
+}
+.ranking-status[data-state="ok"]{color:var(--green)}
+.ranking-status[data-state="error"]{color:var(--red)}
+.ranking-status[data-state="loading"]::before{
+  content:"";width:10px;height:10px;border-radius:50%;
+  border:2px solid #537999;border-top-color:var(--gold);animation:dk-spin .7s linear infinite;
+}
+@keyframes dk-spin{to{transform:rotate(360deg)}}
+th.rank-cell{width:54px}
+.rank-cell{color:#9fb8ca;font:700 12px ui-monospace,Consolas,monospace}
+tr.rank-1 .rank-cell{color:#ffd75e}
+tr.rank-2 .rank-cell{color:#dce8f3}
+tr.rank-3 .rank-cell{color:#e3a06b}
+tr.is-you td{background:#122e46}
+.you-tag{
+  display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;
+  background:#8c622d;color:#fff6de;font:700 9.5px ui-monospace,Consolas,monospace;
+  letter-spacing:.08em;text-transform:uppercase;
+}
+
+/* ---------- Autenticación ---------- */
+.auth-panel{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;padding:16px}
+.auth-panel[hidden]{display:none}
+.auth-backdrop{position:absolute;inset:0;background:#02080fcc;backdrop-filter:blur(3px)}
+.auth-card{
+  position:relative;width:min(400px,100%);max-height:92vh;overflow:auto;
+  background:linear-gradient(180deg,#122a44,#0d2034);border:1px solid #537999;
+  border-radius:14px;box-shadow:0 24px 60px #000b;padding:18px 20px;
+}
+.auth-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.auth-head h3{margin:0;font:800 19px/1.15 ui-monospace,Consolas,monospace;color:var(--gold);letter-spacing:.02em}
+.auth-x{background:transparent;border:0;color:#9db6c8;font-size:18px;padding:2px 8px;cursor:pointer;border-radius:6px}
+.auth-x:hover{color:#fff;background:#1d3449}
+.auth-guest{display:flex;gap:7px}
+.auth-fields{display:flex;flex-direction:column;gap:10px}
+.auth-field label{display:block;font:700 10.5px ui-monospace,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:#8fa9bd;margin-bottom:5px}
+.auth-field input{
+  width:100%;background:#0b1e31;border:1px solid #2f4b64;border-radius:8px;
+  color:#eef6fb;padding:9px 10px;font:13px system-ui,sans-serif;outline:none;
+}
+.auth-field input:focus{border-color:#7fb0c9;box-shadow:0 0 0 2px #7fb0c933}
+.auth-hint{margin:8px 0 0;color:#8fa9bd;font-size:11px;line-height:1.4}
+.auth-hint:empty{display:none}
+.auth-submit{width:100%;margin-top:12px;background:#8c622d;border-color:#e0b672}
+.auth-submit:hover{background:#a47a35}
+.auth-toggle{width:100%;margin-top:8px;background:transparent;border-color:#42617d;color:#b9cfdf;font-weight:600}
+.auth-toggle:hover{background:#163956}
+.auth-error{
+  margin:10px 0 0;padding:8px 10px;border-radius:8px;
+  background:#3a1620;border:1px solid #7d3a4a;color:#ffc2c6;font-size:11.5px;line-height:1.4;
+}
+.auth-user{display:flex;align-items:center;gap:6px;padding:3px 4px 3px 10px;border:1px solid #42617d;border-radius:999px;background:#0e2338}
+.auth-user[hidden]{display:none}
+.auth-alias{font:700 11.5px ui-monospace,Consolas,monospace;color:var(--gold);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.auth-user button{padding:5px 9px;font-size:11px;border-radius:999px}
+
 /* ---------- Toast ---------- */
 #toast{
   position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);

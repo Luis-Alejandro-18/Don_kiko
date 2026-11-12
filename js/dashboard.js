@@ -53,6 +53,12 @@
       profile: null,
       loading: false
     },
+    ranking: {
+      rows: [],
+      loading: false,
+      error: null,
+      loadedAt: 0
+    },
     surveyRunId: null,
     surveyAuto: false,
     surveyFeeling: 0,
@@ -100,6 +106,13 @@
   }
 
   /* ---------- Autenticación (Supabase Auth) ---------- */
+  const MAX_ALIAS = 24;
+
+  function sanitizeAlias(value, fallback = 'usuario') {
+    const text = String(value || '').trim();
+    return Array.from(text).slice(0, MAX_ALIAS).join('') || fallback;
+  }
+
   function isAuthenticated() {
     return !!(state.auth.user && supabase);
   }
@@ -107,27 +120,28 @@
   async function loadProfile(userId, email = '') {
     if (!supabase || !userId) return null;
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('alias')
         .eq('id', userId)
-        .single();
-      if (data) return data;
-      const alias = email ? email.split('@')[0] : 'usuario';
+        .maybeSingle();
+      if (data && data.alias) return data;
+
+      // Sin fila en profiles: se crea con el prefijo del correo (máx. 24 caracteres).
+      const alias = sanitizeAlias(email ? String(email).split('@')[0] : '');
       const { data: inserted, error: insertError } = await supabase
         .from('profiles')
         .insert({ id: userId, alias })
         .select('alias')
-        .single();
+        .maybeSingle();
       if (insertError) {
         console.warn('No se pudo crear perfil:', insertError);
         return { alias };
       }
-      return inserted;
+      return inserted || { alias };
     } catch (e) {
       console.warn('Perfil:', e);
-      const alias = email ? email.split('@')[0] : 'usuario';
-      return { alias };
+      return { alias: sanitizeAlias(email ? String(email).split('@')[0] : '') };
     }
   }
 
@@ -172,29 +186,49 @@
     });
   }
 
+  function authErrorMessage(err) {
+    const raw = String((err && (err.message || err.error_description)) || '');
+    const code = String((err && err.code) || '');
+    if (code === 'email_confirmation_required') return raw;
+    if (/invalid login credentials/i.test(raw)) return 'Correo o contraseña incorrectos.';
+    if (/email not confirmed/i.test(raw)) return 'Confirma tu correo antes de iniciar sesión.';
+    if (/user already registered|already been registered/i.test(raw)) return 'Ese correo ya tiene una cuenta. Inicia sesión.';
+    if (/password should be at least/i.test(raw)) return 'La contraseña debe tener al menos 6 caracteres.';
+    if (/rate limit|too many requests/i.test(raw) || code === 'over_email_send_rate_limit') {
+      return 'Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.';
+    }
+    if (/signups? not allowed|signup is disabled/i.test(raw)) return 'El registro está desactivado en Supabase.';
+    return raw || 'No se pudo completar la autenticación.';
+  }
+
   async function signUp(email, password, alias) {
-    if (!supabase) throw new Error('Supabase no disponible');
+    if (!supabase) throw new Error('Supabase no está configurado.');
+    const cleanAlias = sanitizeAlias(alias, '');
+    if (!cleanAlias) throw new Error('El alias es obligatorio.');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { alias } }
+      options: { data: { alias: cleanAlias } }
     });
-    if (error) throw error;
-    if (data.user) {
-      state.auth.user = data.user;
-      state.auth.profile = { alias };
+    if (error) throw new Error(authErrorMessage(error));
+    const user = (data && data.session && data.session.user) || null;
+    if (!user) {
+      throw new Error('Cuenta creada, pero falta confirmar el correo. Revisa tu bandeja o desactiva "Confirm email" en Supabase.');
     }
+    state.auth.user = user;
+    state.auth.profile = await loadProfile(user.id, user.email);
     updateAuthUI();
     return data;
   }
 
   async function signIn(email, password) {
-    if (!supabase) throw new Error('Supabase no disponible');
+    if (!supabase) throw new Error('Supabase no está configurado.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    if (data.user) {
-      state.auth.user = data.user;
-      state.auth.profile = await loadProfile(data.user.id, data.user.email);
+    if (error) throw new Error(authErrorMessage(error));
+    const user = (data && data.session && data.session.user) || data.user || null;
+    if (user) {
+      state.auth.user = user;
+      state.auth.profile = await loadProfile(user.id, user.email);
     }
     updateAuthUI();
     return data;
@@ -202,7 +236,11 @@
 
   async function signOut() {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Cerrar sesión:', e);
+    }
     state.auth.user = null;
     state.auth.profile = null;
     updateAuthUI();
@@ -365,7 +403,7 @@
       status.textContent = `${st.rows.length} jugador${st.rows.length === 1 ? '' : 'es'} · actualizado ${time}`;
     }
 
-    const me = currentPlayerName().toLowerCase();
+    const me = currentPlayerNameForRanking().toLowerCase();
     body.innerHTML = st.rows.map((row, index) => {
       const name = String(row.player_name || '');
       const isMe = !!me && name.toLowerCase() === me;
@@ -530,6 +568,7 @@
       endedAt: null,
       durationMs: 0,
       result: 'playing',
+      startStage: stage,
       stageReached: stage,
       score: 0,
       livesLeft: 3,
@@ -1257,6 +1296,10 @@
   function setAuthMode(mode) {
     authMode = mode;
     if (!authTitle || !authSubmitBtn || !authToggleBtn) return;
+    if (authError) {
+      authError.hidden = true;
+      authError.textContent = '';
+    }
     if (mode === 'signup') {
       authTitle.textContent = 'Crear cuenta';
       authSubmitBtn.textContent = 'Registrarse';
@@ -1264,6 +1307,8 @@
       if (authFieldEmail) authFieldEmail.style.display = '';
       if (authFieldAlias) authFieldAlias.style.display = '';
       if (authFieldConfirm) authFieldConfirm.style.display = '';
+      if (authAlias) authAlias.required = true;
+      if (authPasswordConfirm) authPasswordConfirm.required = true;
       authPassword.setAttribute('autocomplete', 'new-password');
     } else {
       authTitle.textContent = 'Iniciar sesión';
@@ -1272,6 +1317,8 @@
       if (authFieldEmail) authFieldEmail.style.display = '';
       if (authFieldAlias) authFieldAlias.style.display = 'none';
       if (authFieldConfirm) authFieldConfirm.style.display = 'none';
+      if (authAlias) authAlias.required = false;
+      if (authPasswordConfirm) authPasswordConfirm.required = false;
       authPassword.setAttribute('autocomplete', 'current-password');
     }
   }
@@ -1279,6 +1326,7 @@
   if ($('authSignInBtn')) $('authSignInBtn').addEventListener('click', showAuthPanel);
   if ($('authSignUpBtn')) $('authSignUpBtn').addEventListener('click', () => { showAuthPanel(); setAuthMode('signup'); });
   if ($('authCloseBtn')) $('authCloseBtn').addEventListener('click', hideAuthPanel);
+  if ($('authBackdrop')) $('authBackdrop').addEventListener('click', hideAuthPanel);
   if (authToggleBtn) authToggleBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
 
   if (authForm) {
@@ -1293,18 +1341,24 @@
       const password = authPassword ? authPassword.value : '';
       const alias = authAlias ? authAlias.value.trim() : '';
       authError.hidden = true;
+      const previousLabel = authSubmitBtn.textContent;
       authSubmitBtn.disabled = true;
       try {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Escribe un correo válido.');
+        if (!password) throw new Error('Escribe tu contraseña.');
         if (authMode === 'signup') {
           if (!alias) throw new Error('El alias es obligatorio');
           if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
           if (authPasswordConfirm && authPasswordConfirm.value !== password) throw new Error('Las contraseñas no coinciden');
+          authSubmitBtn.textContent = 'Creando cuenta…';
           await signUp(email, password, alias);
           toast('Cuenta creada. Ya puedes aparecer en el ranking.');
         } else {
+          authSubmitBtn.textContent = 'Entrando…';
           await signIn(email, password);
           toast('Sesión iniciada.');
         }
+        loadRanking();
         hideAuthPanel();
       } catch (err) {
         authError.hidden = false;
@@ -1312,14 +1366,18 @@
         console.warn('Auth error:', err);
       } finally {
         authSubmitBtn.disabled = false;
+        authSubmitBtn.textContent = previousLabel;
       }
     });
   }
 
   if ($('authSignOutBtn')) $('authSignOutBtn').addEventListener('click', async () => {
     await signOut();
+    loadRanking();
     toast('Sesión cerrada');
   });
+
+  if ($('refreshRankingBtn')) $('refreshRankingBtn').addEventListener('click', () => loadRanking());
 
   /* ---------- Arranque ---------- */
   loadRuns();
@@ -1328,6 +1386,7 @@
   renderAll();
   initAuth();
   subscribeAuth();
+  loadRanking();
   window.addEventListener('message', handleGameMessage);
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);

@@ -20,6 +20,17 @@ Esta carpeta contiene el esquema del ranking compartido. El panel ya lee la vist
 El script es idempotente para la primera instalación: crea la tabla, los índices,
 las políticas RLS, la vista y los permisos.
 
+## 2.1 Autenticación (registro y login)
+
+1. **Authentication → Sign In / Providers → Email**: proveedor **Enabled**.
+2. Desactiva **Confirm email**. Sin esto, `signUp` no devuelve sesión: la cuenta
+   se crea pero el usuario no puede entrar hasta confirmar el correo, y además
+   choca con el límite de envíos de Supabase.
+3. `schema.sql` instala el trigger `on_auth_user_created`, que crea la fila de
+   `public.profiles` usando el alias del formulario (o el prefijo del correo).
+4. Volver a ejecutar `schema.sql` también rellena los perfiles que falten de
+   cuentas creadas antes del trigger.
+
 ## 3. Probar la base
 
 Desde el SQL Editor (como propietario, sin RLS):
@@ -108,9 +119,8 @@ de las victorias como desempate.
 ## 7. Seguridad y límites
 
 - RLS activo: `anon` solo lee e inserta; no puede editar ni borrar.
-- No hay autenticación en el MVP: cualquiera puede usar un nombre. Para una
-  clase suele ser suficiente; si se necesita identidad fuerte, se añade
-  Supabase Auth en otra fase.
+- Registro y login con Supabase Auth (correo + contraseña). Solo las cuentas
+  registradas envían al ranking global; el modo local no necesita cuenta.
 - El juego corre en el navegador, así que un usuario avanzado puede enviar un
   puntaje falso. RLS evita modificaciones, no trampas.
 - El plan gratuito de Supabase puede pausar el proyecto por inactividad.

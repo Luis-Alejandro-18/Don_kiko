@@ -221,3 +221,18 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [ ] Pendiente: ejecutar `db/schema.sql` en Supabase SQL Editor (migración).
 - [ ] Pendiente: habilitar Auth (email/password) en Supabase → Authentication.
 - [ ] Pendiente: probar registro, login, logout y envío al ranking desde cuenta autenticada.
+
+### Fase 5 (login visible y ranking funcional) — 2026-11-11
+
+- [x] Diagnóstico: el merge de la encuesta eliminó el CSS `auth-*`; el panel se abría al final del documento y parecía que el botón no hacía nada.
+- [x] `css/styles.css`: `#authPanel` vuelve a ser modal fijo (fondo + tarjeta), estilos de campos, error, botones y bloque de usuario; estilos del ranking.
+- [x] Bug real de login: `authAlias` y `authPasswordConfirm` eran `required` estando ocultos, así que el navegador bloqueaba el envío sin mostrar error. Ahora `required` se activa solo en modo registro y la validación es propia (`novalidate`).
+- [x] `signUp()` exige sesión en la respuesta: si `Confirm email` está activo, muestra un error claro en vez de simular una sesión.
+- [x] Errores de Supabase traducidos (credenciales, correo sin confirmar, rate limit, correo ya registrado).
+- [x] `startRun()` guarda `startStage`; antes `submitRun()` descartaba todas las partidas por `run.startStage !== 1`.
+- [x] `state.ranking` restaurado y sección "Ranking global" de vuelta en `index.html` (`#rankingBody`, `#rankingStatus`, `#rankingEmpty`, `#refreshRankingBtn`).
+- [x] `loadProfile()` trunca el alias a 24 caracteres (`profiles_alias_len`) y usa `maybeSingle()`.
+- [x] Trigger `handle_new_user()` defensivo: alias del formulario o prefijo del correo, `on conflict do nothing`; `schema.sql` rellena perfiles faltantes de cuentas antiguas.
+- [ ] Requiere acción manual en Supabase: Authentication → Providers → Email → **Confirm email OFF**, y volver a ejecutar `schema.sql`.
+- [x] Verificado contra Supabase: `/auth/v1/settings` con `email: true` y `disable_signup: false`; `leaderboard` responde 200 con la consulta exacta del panel.
+- [ ] Pendiente: probar registro/login y envío de una campaña real desde el sitio desplegado.
