@@ -34,9 +34,14 @@
   const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
   const rankingEnabled = !!(rankingUrl && rankingKey);
 
-  const supabase = window.supabase
-    ? window.supabase.createClient(rankingUrl, rankingKey)
-    : null;
+  let supabase = null;
+  if (window.supabase && rankingEnabled) {
+    try {
+      supabase = window.supabase.createClient(rankingUrl, rankingKey);
+    } catch (e) {
+      console.warn('Supabase no disponible:', e);
+    }
+  }
 
   const $ = id => document.getElementById(id);
   const frame = $('gameFrame');
