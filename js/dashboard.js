@@ -3,13 +3,9 @@
   'use strict';
 
   const STORAGE_KEY = 'donkiko_dashboard_runs_v1';
-  const PLAYER_KEY = 'donkiko_dashboard_player_v1';
   const MAX_RUNS = 100;
   const MAX_LOG = 8;
-  const PERSIST_MS = 3000;
-  const RANKING_TIMEOUT_MS = 9000;
-  const RANKING_REFRESH_MS = 30000;
-  const GOAL_X = { 1: 799, 2: 1453, 3: 2345 };
+  const WORLD_WIDTH = { 1: 1000, 2: 1580, 3: 2470 };
   const RESULT_LABELS = {
     won: 'Victoria',
     game_over: 'Sin vidas',
@@ -25,6 +21,9 @@
     lost: 'Game over',
     won: 'Victoria'
   };
+  const DIFF_LABELS = { easy: 'Fácil', fair: 'Justo', hard: 'Difícil' };
+  const FEELING_LABELS = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Genial'];
+  const SURVEY_PREF_KEY = 'donkiko_survey_autoshow';
 
   const $ = id => document.getElementById(id);
   const frame = $('gameFrame');
@@ -35,24 +34,15 @@
     muted: false,
     connected: false,
     storageOk: true,
-    playerName: '',
-    auth: {
-      user: null,
-      profile: null,
-      loading: false
-    },
-    ranking: {
-      rows: [],
-      loading: false,
-      error: null,
-      loadedAt: 0
-    }
+    surveyRunId: null,
+    surveyAuto: false,
+    surveyFeeling: 0,
+    surveyDifficulty: null,
+    surveyHeld: false
   };
   let log = [];
   let toastTimer = null;
   let resizeTimer = null;
-  let lastPersist = 0;
-  let nameHintShown = false;
 
   /* ---------- Utilidades ---------- */
   const now = () => Date.now();
@@ -89,391 +79,26 @@
     toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
   }
 
-  /* ---------- Ranking global (Supabase) ---------- */
-  const rankingConfig = window.DK_CONFIG || {};
-  const rankingUrl = String(rankingConfig.supabaseUrl || '').replace(/\/+$/, '');
-  const rankingKey = String(rankingConfig.supabaseKey || '');
-  const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
-  const rankingEnabled = !!(rankingUrl && rankingKey);
-
-  const supabase = window.supabase
-    ? window.supabase.createClient(rankingUrl, rankingKey)
-    : null;
-
-  function normalizeName(value) {
-    return Array.from(String(value || '').trim()).slice(0, 24).join('');
-  }
-
-  function currentPlayerName() {
-    const input = $('playerName');
-    return normalizeName(input ? input.value : state.playerName);
-  }
-
-  function rankingHeaders(extra = {}) {
-    return {
-      apikey: rankingKey,
-      Authorization: `Bearer ${rankingKey}`,
-      ...extra
-    };
-  }
-
-  function rankingEndpoint(path) {
-    return `${rankingUrl}/rest/v1/${path}`;
-  }
-
-  async function rankingFetch(path, options = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), RANKING_TIMEOUT_MS);
-    try {
-      return await fetch(rankingEndpoint(path), {
-        cache: 'no-store',
-        ...options,
-        signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  function rankingErrorMessage(err) {
-    if (err && err.name === 'AbortError') return 'El ranking tardó demasiado en responder.';
-    const message = String((err && err.message) || '');
-    if (message.includes('HTTP 401') || message.includes('HTTP 403')) {
-      return 'No se pudo autenticar con el ranking. Revisá la clave pública.';
-    }
-    if (message.includes('HTTP 404')) {
-      return 'La vista del ranking no está disponible. Revisá el esquema de Supabase.';
-    }
-    if (location.protocol === 'file:') {
-      return 'No se pudo conectar. Si abriste el archivo con doble clic, probá desde Netlify o http://localhost.';
-    }
-    return 'No se pudo cargar el ranking. Revisá tu conexión.';
-  }
-
-  async function loadRanking() {
-    const st = state.ranking;
-    if (!rankingEnabled) {
-      st.loading = false;
-      st.error = 'El ranking global no está configurado.';
-      renderRanking();
-      return;
-    }
-    if (st.loading) return;
-    st.loading = true;
-    st.error = null;
-    renderRanking();
-    try {
-      const params = new URLSearchParams({
-        select: 'player_name,best_score,best_stage,best_time_ms,runs,last_played',
-        order: 'best_score.desc,best_time_ms.asc.nullslast,last_played.asc',
-        limit: String(rankingLimit)
-      });
-      const res = await rankingFetch(`leaderboard?${params}`, { headers: rankingHeaders() });
-      if (!res.ok) {
-        let detail = '';
-        try {
-          const data = await res.json();
-          detail = data.message || data.hint || '';
-        } catch (e) { /* sin cuerpo útil */ }
-        throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
-      }
-      const data = await res.json();
-      st.rows = Array.isArray(data) ? data.filter(row => row && row.player_name) : [];
-      st.error = null;
-      st.loadedAt = now();
-    } catch (err) {
-      console.warn('Ranking global:', err);
-      st.error = rankingErrorMessage(err);
-    } finally {
-      st.loading = false;
-      renderRanking();
-    }
-  }
-
-  function renderRanking() {
-    const st = state.ranking;
-    const body = $('rankingBody');
-    const empty = $('rankingEmpty');
-    const status = $('rankingStatus');
-    const refresh = $('refreshRankingBtn');
-    const section = document.querySelector('.ranking');
-    if (!body || !empty || !status || !refresh) return;
-
-    if (section) section.setAttribute('aria-busy', st.loading ? 'true' : 'false');
-    refresh.disabled = st.loading || !rankingEnabled;
-    refresh.textContent = st.loading ? 'Actualizando…' : 'Actualizar';
-
-    if (st.loading) {
-      status.dataset.state = 'loading';
-      status.textContent = 'Cargando ranking…';
-    } else if (st.error) {
-      status.dataset.state = 'error';
-      status.textContent = st.error;
-    } else if (!rankingEnabled) {
-      status.dataset.state = 'error';
-      status.textContent = 'El ranking global no está configurado.';
-    } else if (!st.rows.length) {
-      status.dataset.state = 'ok';
-      status.textContent = 'Todavía no hay marcas globales.';
-    } else {
-      const time = st.loadedAt
-        ? new Date(st.loadedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-        : '—';
-      status.dataset.state = 'ok';
-      status.textContent = `${st.rows.length} jugador${st.rows.length === 1 ? '' : 'es'} · actualizado ${time}`;
-    }
-
-    const me = currentPlayerName().toLowerCase();
-    body.innerHTML = st.rows.map((row, index) => {
-      const name = String(row.player_name || '');
-      const isMe = !!me && name.toLowerCase() === me;
-      const rank = index + 1;
-      const rankClass = rank <= 3 ? ` rank-${rank}` : '';
-      return `<tr class="rank-row${rankClass}${isMe ? ' is-you' : ''}">
-        <td class="rank-cell">${rank}</td>
-        <td>${escapeHtml(name)}${isMe ? ' <span class="you-tag">tú</span>' : ''}</td>
-        <td class="num">${fmtNum(row.best_score)}</td>
-        <td class="num">${clamp(Number(row.best_stage) || 0, 0, 3)} / 3</td>
-        <td class="num">${row.best_time_ms != null ? fmtDuration(row.best_time_ms) : '—'}</td>
-        <td class="num">${fmtNum(row.runs)}</td>
-        <td>${row.last_played ? fmtDate(row.last_played) : '—'}</td>
-      </tr>`;
-    }).join('');
-
-    empty.hidden = st.loading || !!st.error || st.rows.length > 0;
-    if (!empty.hidden) {
-      empty.textContent = rankingEnabled
-        ? 'Aún no hay marcas globales. Juega la campaña desde el Nivel 1.'
-        : 'Configurá Supabase en js/config.js para activar el ranking.';
-    }
-  }
-
-  async function submitRun(run) {
-    if (!run || Number(run.startStage) !== 1) return;
-    if (!['won', 'game_over', 'pau_caught'].includes(run.result)) return;
-    if (!rankingEnabled) return;
-
-    if (!isAuthenticated()) {
-      if (!nameHintShown) {
-        nameHintShown = true;
-        toast('Inicia sesión para enviar tu puntaje al ranking global.');
-      }
-      return;
-    }
-
-    const playerName = currentPlayerNameForRanking();
-    if (!playerName) {
-      if (!nameHintShown) {
-        nameHintShown = true;
-        toast('Tu perfil no tiene alias asignado.');
-      }
-      return;
-    }
-
-    const levels = (Array.isArray(run.levels) ? run.levels : [])
-      .slice(0, 3)
-      .map(lv => ({
-        stage: clamp(Number(lv.stage) || 1, 1, 3),
-        completed: !!lv.completed,
-        timeMs: Math.max(0, Math.round(Number(lv.timeMs) || 0)),
-        hurts: Math.max(0, Math.round(Number(lv.hurts) || 0)),
-        tokens: Math.max(0, Math.round(Number(lv.tokens) || 0))
-      }));
-    if (!levels.length) return;
-
-    const activeTime = levels.reduce((total, lv) => total + lv.timeMs, 0);
-    const payload = {
-      client_run_id: String(run.id).slice(0, 64),
-      user_id: state.auth.user ? state.auth.user.id : null,
-      player_name: playerName,
-      score: clamp(Math.round(Number(run.score) || 0), 0, 100000000),
-      result: run.result,
-      start_stage: clamp(Number(run.startStage) || 1, 1, 3),
-      stage_reached: clamp(Number(run.stageReached) || 1, 1, 3),
-      duration_ms: clamp(Math.round(Number(run.durationMs) || 0), 0, 86400000),
-      active_time_ms: clamp(Math.round(activeTime), 0, 86400000),
-      levels
-    };
-
-    try {
-      const res = await rankingFetch('runs', {
-        method: 'POST',
-        headers: rankingHeaders({
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal'
-        }),
-        body: JSON.stringify(payload)
-      });
-      if (res.status === 409) {
-        toast('Esa partida ya estaba en el ranking global.');
-        loadRanking();
-        return;
-      }
-      if (!res.ok) {
-        let detail = '';
-        try {
-          const data = await res.json();
-          detail = data.message || data.hint || '';
-        } catch (e) { /* sin cuerpo útil */ }
-        throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
-      }
-      toast('Puntaje enviado al ranking global.');
-      loadRanking();
-    } catch (err) {
-      console.warn('Ranking global (envío):', err);
-      toast('No se pudo enviar el puntaje; quedó guardado en el historial local.');
-    }
-  }
-
-  /* ---------- Autenticación (Supabase Auth) ---------- */
-  function isAuthenticated() {
-    return !!(state.auth.user && supabase);
-  }
-
-  async function loadProfile(userId, email = '') {
-    if (!supabase || !userId) return null;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('alias')
-        .eq('id', userId)
-        .single();
-      if (data) return data;
-      // Si no existe el perfil, crearlo automáticamente con alias derivado del email
-      const alias = email ? email.split('@')[0] : 'usuario';
-      const { data: inserted, error: insertError } = await supabase
-        .from('profiles')
-        .insert({ id: userId, alias })
-        .select('alias')
-        .single();
-      if (insertError) {
-        console.warn('No se pudo crear perfil:', insertError);
-        return { alias };
-      }
-      return inserted;
-    } catch (e) {
-      console.warn('Perfil:', e);
-      const alias = email ? email.split('@')[0] : 'usuario';
-      return { alias };
-    }
-  }
-
-  async function initAuth() {
-    if (!supabase) {
-      state.auth.loading = false;
-      updateAuthUI();
-      return;
-    }
-    state.auth.loading = true;
-    updateAuthUI();
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
-        state.auth.user = null;
-        state.auth.profile = null;
-      } else {
-        state.auth.user = user;
-        state.auth.profile = await loadProfile(user.id, user.email);
-      }
-    } catch (e) {
-      console.warn('Auth init:', e);
-      state.auth.user = null;
-      state.auth.profile = null;
-    } finally {
-      state.auth.loading = false;
-      updateAuthUI();
-    }
-  }
-
-  // Escuchar cambios de sesión (login/logout en otra pestaña, etc.)
-  function subscribeAuth() {
-    if (!supabase) return;
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        state.auth.user = session?.user ?? null;
-        state.auth.profile = session?.user ? await loadProfile(session.user.id, session.user.email) : null;
-      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        state.auth.user = null;
-        state.auth.profile = null;
-      }
-      updateAuthUI();
-    });
-  }
-
-  async function signUp(email, password, alias) {
-    if (!supabase) throw new Error('Supabase no disponible');
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { alias } }
-    });
-    if (error) throw error;
-    if (data.user) {
-      // El trigger on_auth_user_created crea el perfil automáticamente.
-      state.auth.user = data.user;
-      state.auth.profile = { alias };
-    }
-    updateAuthUI();
-    return data;
-  }
-
-  async function signIn(email, password) {
-    if (!supabase) throw new Error('Supabase no disponible');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    if (data.user) {
-      state.auth.user = data.user;
-      state.auth.profile = await loadProfile(data.user.id, data.user.email);
-    }
-    updateAuthUI();
-    return data;
-  }
-
-  async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    state.auth.user = null;
-    state.auth.profile = null;
-    updateAuthUI();
-  }
-
-  function updateAuthUI() {
-    const userEl = $('authUser');
-    const guestEl = $('authGuest');
-    const aliasEl = $('authUserAlias');
-    if (!userEl || !guestEl || !aliasEl) return;
-
-    if (isAuthenticated() && state.auth.profile) {
-      userEl.hidden = false;
-      guestEl.hidden = true;
-      aliasEl.textContent = state.auth.profile.alias || state.auth.user.email;
-    } else {
-      userEl.hidden = true;
-      guestEl.hidden = false;
-    }
-
-    // Si hay usuario autenticado, usar su alias como nombre para el ranking
-    const nameInput = $('playerName');
-    if (nameInput) {
-      if (isAuthenticated() && state.auth.profile) {
-        nameInput.value = state.auth.profile.alias;
-        nameInput.disabled = true;
-      } else {
-        nameInput.disabled = false;
-      }
-    }
-  }
-
-  function currentPlayerNameForRanking() {
-    if (isAuthenticated() && state.auth.profile) {
-      return state.auth.profile.alias;
-    }
-    return currentPlayerName();
-  }
-
   /* ---------- Persistencia ---------- */
   function isRun(r) {
     return !!r && typeof r === 'object' && typeof r.startedAt === 'number' && typeof r.result === 'string';
+  }
+
+  function starsText(value) {
+    const n = clamp(Math.round(Number(value) || 0), 0, 5);
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+  }
+
+  function normalizeFeedback(fb) {
+    if (!fb || typeof fb !== 'object') return null;
+    const feeling = Math.round(Number(fb.feeling));
+    if (!Number.isFinite(feeling) || feeling < 1 || feeling > 5) return null;
+    return {
+      feeling,
+      difficulty: ['easy', 'fair', 'hard'].includes(fb.difficulty) ? fb.difficulty : null,
+      comment: typeof fb.comment === 'string' ? fb.comment.slice(0, 280) : '',
+      createdAt: typeof fb.createdAt === 'string' ? fb.createdAt : new Date().toISOString()
+    };
   }
 
   function normalizeRun(r) {
@@ -481,59 +106,50 @@
     const result = wasPlaying
       ? 'abandoned'
       : (RESULT_LABELS[r.result] ? r.result : 'abandoned');
-    const levels = Array.isArray(r.levels) ? r.levels.map(lv => ({
-      stage: clamp(Number(lv.stage) || 1, 1, 3),
-      completed: !!lv.completed,
-      closed: true,
-      timeMs: Number(lv.timeMs) || 0,
-      hurts: Number(lv.hurts) || 0,
-      tokens: Number(lv.tokens) || 0,
-      startedAt: Number(lv.startedAt) || r.startedAt
-    })) : [];
-    const startStage = clamp(
-      Number(r.startStage) || (levels.length ? Number(levels[0].stage) : 1) || 1,
-      1, 3
-    );
-    const lastSeenAt = Number(r.lastSeenAt) || null;
-    const endedAt = r.endedAt || (wasPlaying ? (lastSeenAt || Number(r.startedAt)) : null);
+    const endedAt = r.endedAt || (wasPlaying ? now() : null);
     return {
-      id: /^[a-z0-9-]{1,40}$/i.test(String(r.id || '')) ? String(r.id) : uid(),
+      id: r.id || uid(),
       startedAt: r.startedAt,
-      lastSeenAt,
       endedAt,
       durationMs: Number(r.durationMs) || (wasPlaying ? Math.max(0, endedAt - r.startedAt) : 0),
       result,
-      startStage,
       stageReached: clamp(Number(r.stageReached) || 1, 1, 3),
       score: Number(r.score) || 0,
       livesLeft: Number(r.livesLeft) || 0,
       cause: r.cause || null,
-      levels
+      feedback: normalizeFeedback(r.feedback),
+      levels: Array.isArray(r.levels) ? r.levels.map(lv => ({
+        stage: clamp(Number(lv.stage) || 1, 1, 3),
+        completed: !!lv.completed,
+        closed: true,
+        timeMs: Number(lv.timeMs) || 0,
+        hurts: Number(lv.hurts) || 0,
+        tokens: Number(lv.tokens) || 0,
+        startedAt: Number(lv.startedAt) || r.startedAt
+      })) : []
     };
   }
 
   function loadRuns() {
-    let raw = null;
     try {
-      raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed && parsed.runs) ? parsed.runs : [];
+        state.runs = arr.filter(isRun).map(normalizeRun).slice(0, MAX_RUNS);
+      }
       state.storageOk = true;
     } catch (e) {
       state.storageOk = false;
       $('storageWarning').hidden = false;
-      return;
     }
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed && parsed.runs) ? parsed.runs : [];
-      state.runs = arr
-        .filter(isRun)
-        .map(normalizeRun)
-        .sort((a, b) => b.startedAt - a.startedAt)
-        .slice(0, MAX_RUNS);
-    } catch (e) {
-      state.runs = [];
-      toast('El historial guardado está dañado; se ignoró.');
+    // Partidas que quedaron "en curso" en una sesión anterior.
+    for (const r of state.runs) {
+      if (r.result === 'playing') {
+        r.result = 'abandoned';
+        r.endedAt = r.endedAt || now();
+        r.durationMs = r.durationMs || Math.max(0, r.endedAt - r.startedAt);
+      }
     }
   }
 
@@ -547,21 +163,24 @@
     }
   }
 
-  function loadPlayerName() {
-    let saved = '';
-    try {
-      saved = localStorage.getItem(PLAYER_KEY) || '';
-    } catch (e) { /* el nombre queda solo en memoria */ }
-    state.playerName = normalizeName(saved);
-    const input = $('playerName');
-    if (input) input.value = state.playerName;
+  /* ---------- Preferencia de la encuesta ---------- */
+  function surveyPrefOn() {
+    try { return localStorage.getItem(SURVEY_PREF_KEY) !== 'off'; }
+    catch (e) { return true; }
   }
 
-  function persistPlayerName(value) {
-    state.playerName = value;
-    try {
-      localStorage.setItem(PLAYER_KEY, value);
-    } catch (e) { /* el nombre queda solo en memoria */ }
+  function setSurveyPref(on) {
+    try { localStorage.setItem(SURVEY_PREF_KEY, on ? 'on' : 'off'); }
+    catch (e) {}
+    updateSurveyPrefBtn();
+  }
+
+  function updateSurveyPrefBtn() {
+    const btn = $('surveyPrefBtn');
+    if (!btn) return;
+    const on = surveyPrefOn();
+    btn.textContent = `Encuesta automática: ${on ? 'sí' : 'no'}`;
+    btn.setAttribute('aria-pressed', String(on));
   }
 
   /* ---------- Modelo de partidas ---------- */
@@ -582,11 +201,10 @@
   function ensureLevel(stage) {
     const run = state.current;
     if (!run) return null;
-    const n = clamp(Number(stage) || 1, 1, 3);
     let lv = currentLevel();
-    if (!lv || lv.stage !== n) {
+    if (!lv || lv.stage !== stage) {
       closeLevel();
-      lv = { stage: n, completed: false, closed: false, timeMs: 0, hurts: 0, tokens: 0, startedAt: now() };
+      lv = { stage, completed: false, closed: false, timeMs: 0, hurts: 0, tokens: 0, startedAt: now() };
       run.levels.push(lv);
     }
     return lv;
@@ -598,11 +216,9 @@
     const run = {
       id: uid(),
       startedAt: now(),
-      lastSeenAt: now(),
       endedAt: null,
       durationMs: 0,
       result: 'playing',
-      startStage: stage,
       stageReached: stage,
       score: 0,
       livesLeft: 3,
@@ -612,22 +228,16 @@
     state.runs.unshift(run);
     if (state.runs.length > MAX_RUNS) state.runs.length = MAX_RUNS;
     state.current = run;
-    lastPersist = now();
     persist();
-    log = [];
     logEvent(`Partida iniciada · Nivel ${stage}`, 'gold');
     renderAll();
   }
 
   function endRun(result, extra = {}) {
     const run = state.current;
-    if (!run) return;
-    const snapTime = state.snap && typeof state.snap.elapsed === 'number'
-      ? state.snap.elapsed * 1000
-      : undefined;
-    closeLevel(typeof extra.levelTime === 'number' ? extra.levelTime : snapTime);
+    if (!run) return null;
+    closeLevel(extra.levelTime);
     run.endedAt = now();
-    run.lastSeenAt = run.endedAt;
     run.durationMs = Math.max(0, run.endedAt - run.startedAt);
     run.result = result;
     if (typeof extra.score === 'number') run.score = extra.score;
@@ -635,43 +245,29 @@
     if (typeof extra.stage === 'number') run.stageReached = Math.max(run.stageReached, extra.stage);
     if (extra.cause) run.cause = extra.cause;
     state.current = null;
-    lastPersist = now();
     persist();
     renderAll();
-    if (result !== 'abandoned') submitRun(run);
+    return run;
   }
 
   /* ---------- Telemetría del juego ---------- */
   function handleSnapshot(d) {
     const prev = state.snap;
     state.snap = d;
-    if (typeof d.muted === 'boolean') state.muted = d.muted;
     if (state.current) {
-      const run = state.current;
-      run.lastSeenAt = now();
-      let lv = currentLevel();
-      const snapStage = Number(d.stage);
-      if (d.phase === 'playing' && lv && Number.isFinite(snapStage) && snapStage !== lv.stage) {
+      const lv = currentLevel();
+      if (lv && d.stage !== lv.stage) {
         closeLevel(prev ? prev.elapsed * 1000 : undefined);
-        lv = ensureLevel(snapStage);
-      }
-      if (lv && !lv.closed) {
-        lv.timeMs = Math.round((Number(d.elapsed) || 0) * 1000);
+        ensureLevel(d.stage);
       }
       if (d.phase === 'playing') {
-        run.score = d.score || 0;
-        run.livesLeft = d.lives || 0;
-        run.stageReached = Math.max(run.stageReached, d.stage || 1);
-      }
-      if (now() - lastPersist >= PERSIST_MS) {
-        lastPersist = now();
-        persist();
+        state.current.score = d.score || 0;
+        state.current.livesLeft = d.lives || 0;
+        state.current.stageReached = Math.max(state.current.stageReached, d.stage || 1);
       }
     }
     setStatus(d.phase);
     updatePauseButton(d.phase);
-    updateContinueButton(d.phase);
-    updateSoundButton();
     renderLive();
   }
 
@@ -684,7 +280,6 @@
     if (state.current) {
       if (typeof d.score === 'number') state.current.score = d.score;
       state.current.stageReached = Math.max(state.current.stageReached, d.stage || 1);
-      state.current.lastSeenAt = now();
     }
     logEvent(`Nivel ${d.stage} superado · +${d.bonus || 0} de bonus`, 'good');
     persist();
@@ -692,8 +287,6 @@
   }
 
   function handleGameMessage(ev) {
-    if (ev.source !== frame.contentWindow) return;
-    if (location.protocol !== 'file:' && ev.origin !== location.origin) return;
     const d = ev.data;
     if (!d || d.source !== 'donkiko') return;
 
@@ -743,21 +336,143 @@
         logEvent('Juego reanudado', 'info');
         break;
 
-      case 'pau_caught':
+      case 'pau_caught': {
         logEvent('Pau los atrapó', 'bad');
-        endRun('pau_caught', { score: d.score, stage: d.stage, lives: 0, cause: 'pau' });
+        const run = endRun('pau_caught', { score: d.score, stage: d.stage, lives: 0, cause: 'pau' });
+        maybeOpenSurvey(run, true);
         break;
+      }
 
-      case 'game_over':
+      case 'game_over': {
         logEvent('Game over: sin vidas', 'bad');
-        endRun('game_over', { score: d.score, stage: d.stage, lives: 0, cause: d.cause || 'hazard' });
+        const run = endRun('game_over', { score: d.score, stage: d.stage, lives: 0, cause: d.cause || 'hazard' });
+        maybeOpenSurvey(run);
         break;
+      }
 
-      case 'won':
+      case 'won': {
         logEvent('¡Campaña completada!', 'good');
-        endRun('won', { score: d.score, stage: 3, lives: state.snap?.lives ?? 0, cause: 'goal' });
+        const run = endRun('won', { score: d.score, stage: 3, lives: state.snap?.lives ?? 0, cause: 'goal' });
+        maybeOpenSurvey(run);
         break;
+      }
     }
+  }
+
+  /* ---------- Encuesta de jugadores ---------- */
+  function shouldSurvey(run) {
+    if (!run || run.feedback) return false;
+    if (!['won', 'game_over', 'pau_caught'].includes(run.result)) return false;
+    return surveyPrefOn();
+  }
+
+  function maybeOpenSurvey(run, hold = false) {
+    if (!shouldSurvey(run)) return;
+    if (!$('surveyModal').hidden) return;
+    if (hold) {
+      send('hold');
+      state.surveyHeld = true;
+    }
+    openSurvey(run.id, true);
+  }
+
+  function openSurvey(runId, auto = false) {
+    const run = state.runs.find(r => r.id === runId);
+    if (!run || run.result === 'playing') return;
+    state.surveyRunId = runId;
+    state.surveyAuto = !!auto;
+    state.surveyFeeling = run.feedback ? run.feedback.feeling : 0;
+    state.surveyDifficulty = run.feedback ? run.feedback.difficulty : null;
+    $('surveySub').textContent = `${RESULT_LABELS[run.result] || run.result} · Nivel ${run.stageReached || 1}/3 · ${fmtDate(run.startedAt)}`;
+    $('surveyComment').value = run.feedback ? run.feedback.comment : '';
+    $('commentCount').textContent = String($('surveyComment').value.length);
+    $('surveyNoAuto').checked = !surveyPrefOn();
+    $('surveyDelete').hidden = !run.feedback;
+    $('surveyError').hidden = true;
+    renderSurveySelection();
+    renderSurveyDifficulty();
+    $('surveyModal').hidden = false;
+    document.body.classList.add('modal-open');
+    setTimeout(() => {
+      const target = document.querySelector(`#surveyStars [data-feeling="${state.surveyFeeling || 1}"]`);
+      if (target) target.focus();
+    }, 40);
+  }
+
+  function closeSurvey(sendContinue = true) {
+    $('surveyModal').hidden = true;
+    document.body.classList.remove('modal-open');
+    if (sendContinue && state.surveyHeld) {
+      send('continue');
+      state.surveyHeld = false;
+    }
+    state.surveyRunId = null;
+    state.surveyAuto = false;
+  }
+
+  function applySurveyPref() {
+    setSurveyPref(!$('surveyNoAuto').checked);
+  }
+
+  function renderSurveySelection() {
+    document.querySelectorAll('#surveyStars [data-feeling]').forEach(btn => {
+      const v = Number(btn.dataset.feeling);
+      const on = v <= state.surveyFeeling;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-checked', String(v === state.surveyFeeling));
+    });
+    $('starsCaption').textContent = state.surveyFeeling ? FEELING_LABELS[state.surveyFeeling] : 'Toca una estrella';
+  }
+
+  function renderSurveyDifficulty() {
+    document.querySelectorAll('#surveyDifficulty [data-difficulty]').forEach(btn => {
+      const on = btn.dataset.difficulty === state.surveyDifficulty;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-checked', String(on));
+    });
+  }
+
+  function saveSurvey() {
+    if (!state.surveyFeeling) {
+      $('surveyError').hidden = false;
+      return;
+    }
+    const run = state.runs.find(r => r.id === state.surveyRunId);
+    if (!run) {
+      closeSurvey();
+      return;
+    }
+    run.feedback = {
+      feeling: state.surveyFeeling,
+      difficulty: state.surveyDifficulty || null,
+      comment: $('surveyComment').value.trim().slice(0, 280),
+      createdAt: new Date().toISOString()
+    };
+    applySurveyPref();
+    persist();
+    renderAll();
+    closeSurvey();
+    toast('¡Gracias por tu opinión!');
+  }
+
+  function skipSurvey() {
+    const wasAuto = state.surveyAuto;
+    applySurveyPref();
+    closeSurvey();
+    toast(wasAuto ? 'Puedes responder después desde el historial.' : 'Encuesta cerrada.');
+  }
+
+  function deleteSurvey() {
+    const run = state.runs.find(r => r.id === state.surveyRunId);
+    if (!run) {
+      closeSurvey();
+      return;
+    }
+    run.feedback = null;
+    persist();
+    renderAll();
+    closeSurvey();
+    toast('Respuesta eliminada');
   }
 
   /* ---------- Interfaz ---------- */
@@ -768,22 +483,7 @@
   }
 
   function updatePauseButton(phase) {
-    const btn = $('pauseToggleBtn');
-    const active = phase === 'playing' || phase === 'paused';
-    btn.disabled = !active;
-    btn.textContent = phase === 'paused' ? 'Reanudar' : 'Pausa';
-  }
-
-  function updateContinueButton(phase) {
-    const btn = $('continueBtn');
-    const active = phase === 'menu' || phase === 'intermission' || phase === 'lost' || phase === 'won';
-    btn.disabled = !active;
-    btn.textContent = phase === 'intermission' ? 'Siguiente nivel'
-      : (phase === 'menu' || phase === 'lost' || phase === 'won') ? 'Jugar' : 'Continuar';
-  }
-
-  function updateSoundButton() {
-    $('soundToggleBtn').textContent = state.muted ? 'Sonido: no' : 'Sonido: sí';
+    $('pauseToggleBtn').textContent = phase === 'paused' ? 'Reanudar' : 'Pausa';
   }
 
   function renderLive() {
@@ -795,17 +495,11 @@
     $('liveTime').textContent = fmtDuration((s.elapsed || 0) * 1000);
     $('liveStage').textContent = s.levelName || '—';
     $('livePos').textContent = `${fmtNum(s.x)} px`;
-    $('livePau').textContent = s.pauActive ? `${fmtNum(Math.abs(s.x - s.pauX))} px` : '—';
+    $('livePau').textContent = s.pauActive ? `${fmtNum(Math.max(0, s.x - s.pauX))} px` : '—';
     $('liveObjects').textContent = fmtNum(s.objects);
-    const floor = clamp(Number(s.floor) || 0, 0, 5);
-    $('liveFriend').textContent = s.stage === 1
-      ? `Piso ${floor} / 5`
-      : s.friendX == null ? '—' : `${fmtNum(Math.abs(s.x - s.friendX))} px`;
-    const goal = Number(s.goalX) || GOAL_X[s.stage] || 1000;
-    const ratio = s.stage === 1
-      ? (floor + clamp(Number(s.x) || 0, 0, goal) / goal) / 6
-      : (Number(s.x) || 0) / goal;
-    $('liveProgress').style.width = `${clamp(ratio * 100, 0, 100).toFixed(1)}%`;
+    $('liveFriend').textContent = s.friendX == null ? '—' : `${fmtNum(Math.max(0, s.x - s.friendX))} px`;
+    const total = WORLD_WIDTH[s.stage] || 1000;
+    $('liveProgress').style.width = `${clamp(s.x / total * 100, 0, 100).toFixed(1)}%`;
   }
 
   function logEvent(text, kind = 'info') {
@@ -848,6 +542,53 @@
     $('kpiTotalPoints').textContent = fmtNum(points);
   }
 
+  function renderFeedbackKpis() {
+    const runs = finishedRuns();
+    const withFb = runs.filter(r => r.feedback);
+    const total = withFb.length;
+    const avg = total ? withFb.reduce((a, r) => a + r.feedback.feeling, 0) / total : 0;
+    const positive = withFb.filter(r => r.feedback.feeling >= 4).length;
+    const counts = { easy: 0, fair: 0, hard: 0 };
+    withFb.forEach(r => {
+      if (r.feedback.difficulty) counts[r.feedback.difficulty]++;
+    });
+    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+
+    $('kpiFeeling').textContent = total ? `${avg.toFixed(1)} / 5` : '—';
+    $('kpiFeelingCount').textContent = `${total} respuesta${total === 1 ? '' : 's'}`;
+    $('kpiResponses').textContent = fmtNum(total);
+    $('kpiResponseRate').textContent = `de ${fmtNum(runs.length)} partida${runs.length === 1 ? '' : 's'}`;
+    $('kpiPositive').textContent = total ? `${Math.round(positive / total * 100)}%` : '—';
+    $('kpiDifficulty').textContent = top && top[1] ? DIFF_LABELS[top[0]] : '—';
+  }
+
+  function renderComments() {
+    const filter = $('filterFeedback').value;
+    let items = finishedRuns().filter(r => r.feedback);
+    if (filter === 'positive') items = items.filter(r => r.feedback.feeling >= 4);
+    else if (filter === 'negative') items = items.filter(r => r.feedback.feeling <= 3);
+    else if (filter === 'with-comment') items = items.filter(r => r.feedback.comment);
+
+    items = items.slice().sort((a, b) => new Date(b.feedback.createdAt) - new Date(a.feedback.createdAt));
+    const box = $('commentsList');
+    box.innerHTML = items.map(r => {
+      const fb = r.feedback;
+      const comment = fb.comment
+        ? `<p>${escapeHtml(fb.comment)}</p>`
+        : '<p class="muted">Sin comentario</p>';
+      return `<article class="comment-item">
+        <div class="comment-top">
+          <span class="comment-stars" title="${fb.feeling}/5">${starsText(fb.feeling)}</span>
+          <span class="tag ${r.result}">${RESULT_LABELS[r.result] || r.result}</span>
+          ${fb.difficulty ? `<span>${DIFF_LABELS[fb.difficulty]}</span>` : ''}
+          <time>${fmtDate(r.startedAt)}</time>
+        </div>
+        ${comment}
+      </article>`;
+    }).join('');
+    $('commentsEmpty').hidden = items.length > 0;
+  }
+
   function causeLabel(r) {
     if (r.result === 'won') return 'Llegó a la cantina';
     if (r.result === 'pau_caught') return 'Alcanzado por Pau';
@@ -863,28 +604,26 @@
 
     body.innerHTML = rows.map(r => {
       const playing = r.result === 'playing';
-      const test = Number(r.startStage) > 1
-        ? ' <span class="tag test" title="Partida iniciada en el nivel ' + Number(r.startStage) + '">prueba</span>'
-        : '';
+      const fbStars = r.feedback
+        ? `<span class="comment-stars" title="${r.feedback.feeling}/5">${'★'.repeat(r.feedback.feeling)}</span>`
+        : '—';
+      const surveyBtn = playing
+        ? ''
+        : `<button class="icon-btn survey-btn${r.feedback ? ' has-feedback' : ''}" data-survey="${r.id}" title="${r.feedback ? 'Editar encuesta' : 'Responder encuesta'}" aria-label="${r.feedback ? 'Editar encuesta' : 'Responder encuesta'}">★</button>`;
       return `<tr>
         <td>${fmtDate(r.startedAt)}</td>
-        <td>${r.stageReached || 1} / 3${test}</td>
+        <td>${r.stageReached || 1} / 3</td>
         <td class="num">${fmtNum(r.score)}</td>
+        <td class="num">${fbStars}</td>
         <td class="num">${playing ? '—' : fmtNum(r.livesLeft)}</td>
         <td class="num">${playing ? '—' : fmtDuration(r.durationMs)}</td>
         <td><span class="tag ${r.result}">${RESULT_LABELS[r.result] || r.result}</span></td>
         <td>${causeLabel(r)}</td>
-        <td class="center">${playing ? '' : `<button class="icon-btn" data-del="${escapeHtml(r.id)}" title="Eliminar esta partida">✕</button>`}</td>
+        <td class="center">${surveyBtn}${playing ? '' : `<button class="icon-btn" data-del="${r.id}" title="Eliminar esta partida">✕</button>`}</td>
       </tr>`;
     }).join('');
 
-    const empty = $('historyEmpty');
-    empty.hidden = rows.length > 0;
-    if (!rows.length) {
-      empty.textContent = filter === 'all'
-        ? 'Aún no hay partidas. Juega desde el panel y aparecerán aquí.'
-        : 'No hay partidas con este filtro.';
-    }
+    $('historyEmpty').hidden = rows.length > 0;
   }
 
   function renderCharts() {
@@ -894,11 +633,15 @@
     window.DKCharts.results($('chartResults'), runs);
     window.DKCharts.hurts($('chartHurts'), runs);
     window.DKCharts.funnel($('chartFunnel'), runs);
+    window.DKCharts.feelings($('chartFeelings'), runs);
+    window.DKCharts.difficulty($('chartDifficulty'), runs);
   }
 
   function renderAll() {
     renderKpis();
+    renderFeedbackKpis();
     renderTable();
+    renderComments();
     renderCharts();
     renderLive();
   }
@@ -918,19 +661,14 @@
       if (cmd === 'start') {
         send('start', { level: Number(btn.dataset.level) || 1 });
       } else if (cmd === 'toggle') {
-        const phase = state.snap && state.snap.phase;
-        if (phase === 'paused') send('resume');
-        else if (phase === 'playing') send('pause');
-        else send('continue');
-      } else if (cmd === 'continue') {
-        send('continue');
+        send('toggle');
       } else if (cmd === 'restart') {
         if (confirm('¿Reiniciar la campaña desde el nivel 1? La partida actual se marcará como abandonada.')) {
           send('restart');
         }
       } else if (cmd === 'mute') {
         state.muted = !state.muted;
-        updateSoundButton();
+        btn.textContent = state.muted ? 'Sonido: no' : 'Sonido: sí';
         send('mute', { value: state.muted });
       }
     });
@@ -938,131 +676,61 @@
 
   /* ---------- Historial: borrar, filtrar, exportar, importar ---------- */
   $('historyBody').addEventListener('click', ev => {
+    const surveyBtn = ev.target.closest('[data-survey]');
+    if (surveyBtn) {
+      openSurvey(surveyBtn.dataset.survey, false);
+      return;
+    }
     const btn = ev.target.closest('[data-del]');
     if (!btn) return;
     const id = btn.dataset.del;
     if (!confirm('¿Eliminar esta partida del historial?')) return;
-    const wasCurrent = !!state.current && state.current.id === id;
     state.runs = state.runs.filter(r => r.id !== id);
-    if (wasCurrent) state.current = null;
+    if (state.current && state.current.id === id) state.current = null;
     persist();
     renderAll();
-    toast(wasCurrent ? 'Partida eliminada; la partida en curso ya no se registra' : 'Partida eliminada');
-  });
-
-  $('playerName').addEventListener('input', ev => {
-    persistPlayerName(ev.target.value);
-    renderRanking();
-  });
-
-  $('playerName').addEventListener('change', ev => {
-    const name = normalizeName(ev.target.value);
-    ev.target.value = name;
-    persistPlayerName(name);
-    renderRanking();
-  });
-
-  $('refreshRankingBtn').addEventListener('click', loadRanking);
-
-  /* ---------- Autenticación: UI ---------- */
-  const authPanel = $('authPanel');
-  const authForm = $('authForm');
-  const authTitle = $('authTitle');
-  const authSubmitBtn = $('authSubmitBtn');
-  const authToggleBtn = $('authToggleBtn');
-  const authError = $('authError');
-  const authEmail = $('authEmail');
-  const authPassword = $('authPassword');
-  const authPasswordConfirm = $('authPasswordConfirm');
-  const authAlias = $('authAlias');
-  const authFieldEmail = $('authFieldEmail');
-  const authFieldAlias = $('authFieldAlias');
-  const authFieldConfirm = $('authFieldConfirm');
-  let authMode = 'login'; // 'login' | 'signup'
-
-  function showAuthPanel() {
-    if (!authPanel) return;
-    authPanel.hidden = false;
-    authError.hidden = true;
-    authError.textContent = '';
-    authForm.reset();
-    setAuthMode('login');
-  }
-
-  function hideAuthPanel() {
-    if (!authPanel) return;
-    authPanel.hidden = true;
-    authError.hidden = true;
-  }
-
-  function setAuthMode(mode) {
-    authMode = mode;
-    if (!authTitle || !authSubmitBtn || !authToggleBtn) return;
-    if (mode === 'signup') {
-      authTitle.textContent = 'Crear cuenta';
-      authSubmitBtn.textContent = 'Registrarse';
-      authToggleBtn.textContent = '¿Ya tienes cuenta? Inicia sesión';
-      if (authFieldEmail) authFieldEmail.style.display = '';
-      if (authFieldAlias) authFieldAlias.style.display = '';
-      if (authFieldConfirm) authFieldConfirm.style.display = '';
-      authPassword.setAttribute('autocomplete', 'new-password');
-    } else {
-      authTitle.textContent = 'Iniciar sesión';
-      authSubmitBtn.textContent = 'Iniciar sesión';
-      authToggleBtn.textContent = '¿No tienes cuenta? Regístrate';
-      if (authFieldEmail) authFieldEmail.style.display = '';
-      if (authFieldAlias) authFieldAlias.style.display = 'none';
-      if (authFieldConfirm) authFieldConfirm.style.display = 'none';
-      authPassword.setAttribute('autocomplete', 'current-password');
-    }
-  }
-
-  if ($('authSignInBtn')) $('authSignInBtn').addEventListener('click', showAuthPanel);
-  if ($('authSignUpBtn')) $('authSignUpBtn').addEventListener('click', () => { showAuthPanel(); setAuthMode('signup'); });
-  if ($('authCloseBtn')) $('authCloseBtn').addEventListener('click', hideAuthPanel);
-  if (authToggleBtn) authToggleBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
-
-  if (authForm) {
-    authForm.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      if (!supabase) {
-        authError.hidden = false;
-        authError.textContent = 'Supabase no está configurado.';
-        return;
-      }
-      const email = authEmail ? authEmail.value.trim() : '';
-      const password = authPassword ? authPassword.value : '';
-      const alias = authAlias ? authAlias.value.trim() : '';
-      authError.hidden = true;
-      authSubmitBtn.disabled = true;
-      try {
-        if (authMode === 'signup') {
-          if (!alias) throw new Error('El alias es obligatorio');
-          if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
-          if (authPasswordConfirm && authPasswordConfirm.value !== password) throw new Error('Las contraseñas no coinciden');
-          await signUp(email, password, alias);
-          toast('Cuenta creada. Ya puedes aparecer en el ranking.');
-        } else {
-          await signIn(email, password);
-          toast('Sesión iniciada.');
-        }
-        hideAuthPanel();
-      } catch (err) {
-        authError.hidden = false;
-        authError.textContent = err.message || 'Error de autenticación';
-        console.warn('Auth error:', err);
-      } finally {
-        authSubmitBtn.disabled = false;
-      }
-    });
-  }
-
-  if ($('authSignOutBtn')) $('authSignOutBtn').addEventListener('click', async () => {
-    await signOut();
-    toast('Sesión cerrada');
+    toast('Partida eliminada');
   });
 
   $('filterResult').addEventListener('change', renderTable);
+
+  function downloadBlob(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function exportSurveyCsv() {
+    const rows = finishedRuns().filter(r => r.feedback);
+    if (!rows.length) {
+      toast('No hay encuestas para exportar');
+      return;
+    }
+    const head = ['fecha_partida', 'nivel', 'puntos', 'resultado', 'estrellas', 'dificultad', 'comentario', 'fecha_encuesta'];
+    const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const lines = [head.join(',')];
+    rows.forEach(r => {
+      lines.push([
+        new Date(r.startedAt).toISOString(),
+        r.stageReached || 1,
+        r.score || 0,
+        RESULT_LABELS[r.result] || r.result,
+        r.feedback.feeling,
+        DIFF_LABELS[r.feedback.difficulty] || '',
+        r.feedback.comment || '',
+        r.feedback.createdAt
+      ].map(esc).join(','));
+    });
+    const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    downloadBlob(blob, `don-kiko-encuestas-${stamp}.csv`);
+    toast('Encuestas exportadas');
+  }
 
   $('exportBtn').addEventListener('click', () => {
     if (!state.runs.length) {
@@ -1092,30 +760,19 @@
     const file = ev.target.files && ev.target.files[0];
     ev.target.value = '';
     if (!file) return;
-    if (state.current) {
-      toast('Termina la partida en curso antes de importar');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast('El archivo es demasiado grande (máximo 2 MB)');
-      return;
-    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
         const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed && parsed.runs) ? parsed.runs : [];
-        const valid = arr
-          .filter(isRun)
-          .map(normalizeRun)
-          .sort((a, b) => b.startedAt - a.startedAt);
+        const valid = arr.filter(isRun).map(normalizeRun);
         if (!valid.length) throw new Error('sin partidas válidas');
         if (!confirm(`Se importarán ${valid.length} partidas y se reemplazará el historial actual. ¿Continuar?`)) return;
         state.runs = valid.slice(0, MAX_RUNS);
         state.current = null;
         persist();
         renderAll();
-        toast(`${state.runs.length} partidas importadas`);
+        toast(`${valid.length} partidas importadas`);
       } catch (e) {
         toast('Archivo inválido: no se pudo importar');
       }
@@ -1130,46 +787,59 @@
       return;
     }
     if (!confirm('¿Borrar todas las partidas guardadas? Esta acción no se puede deshacer.')) return;
-    const wasPlaying = !!state.current;
     state.runs = [];
     state.current = null;
     persist();
     renderAll();
-    toast(wasPlaying ? 'Historial borrado; la partida en curso ya no se registra' : 'Historial borrado');
+    toast('Historial borrado');
   });
 
   $('openGameBtn').addEventListener('click', () => {
     window.open('game/don_kiko.html', '_blank', 'noopener');
   });
 
-  /* ---------- Arranque ---------- */
-  function persistNow() {
-    if (!state.current) return;
-    const lv = currentLevel();
-    if (lv && !lv.closed) {
-      lv.timeMs = Math.round((Number(state.snap && state.snap.elapsed) || 0) * 1000);
-    }
-    state.current.lastSeenAt = now();
-    persist();
-  }
+  /* ---------- Encuesta: interacción ---------- */
+  document.querySelectorAll('#surveyStars [data-feeling]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.surveyFeeling = Number(btn.dataset.feeling);
+      $('surveyError').hidden = true;
+      renderSurveySelection();
+    });
+  });
 
-  loadPlayerName();
+  document.querySelectorAll('#surveyDifficulty [data-difficulty]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.difficulty;
+      state.surveyDifficulty = state.surveyDifficulty === value ? null : value;
+      renderSurveyDifficulty();
+    });
+  });
+
+  $('surveyComment').addEventListener('input', () => {
+    $('commentCount').textContent = String($('surveyComment').value.length);
+  });
+
+  $('surveySave').addEventListener('click', saveSurvey);
+  $('surveyDelete').addEventListener('click', deleteSurvey);
+  document.querySelectorAll('[data-survey-close]').forEach(el => el.addEventListener('click', skipSurvey));
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && !$('surveyModal').hidden) skipSurvey();
+  });
+
+  $('surveyPrefBtn').addEventListener('click', () => {
+    const on = !surveyPrefOn();
+    setSurveyPref(on);
+    toast(on ? 'Encuesta automática activada' : 'Encuesta automática desactivada');
+  });
+  $('exportSurveyBtn').addEventListener('click', exportSurveyCsv);
+  $('filterFeedback').addEventListener('change', renderComments);
+
+  /* ---------- Arranque ---------- */
   loadRuns();
+  updateSurveyPrefBtn();
   renderLog();
   renderAll();
-  initAuth();
-  subscribeAuth();
-  loadRanking();
   window.addEventListener('message', handleGameMessage);
-  window.addEventListener('pagehide', persistNow);
-  window.addEventListener('online', () => loadRanking());
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      persistNow();
-    } else if (rankingEnabled && now() - state.ranking.loadedAt > RANKING_REFRESH_MS) {
-      loadRanking();
-    }
-  });
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(renderCharts, 150);

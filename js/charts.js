@@ -227,8 +227,6 @@
     }
     const total = list.length;
     const reachedStage = (run, stage) => {
-      const start = Math.min(3, Math.max(1, Number(run.startStage) || 1));
-      if (stage < start) return false;
       if (Array.isArray(run.levels) && run.levels.length) {
         return run.levels.some(lv => (Number(lv.stage) || 1) >= stage);
       }
@@ -242,5 +240,88 @@
     hbars(canvas, reached, GREEN, 100);
   }
 
-  window.DKCharts = { scores, results, hurts, funnel };
+  /* Sentimientos: barras verticales de 1 a 5 estrellas. */
+  function feelings(canvas, runs) {
+    const { ctx, w, h } = setup(canvas);
+    const counts = [0, 0, 0, 0, 0];
+    let total = 0;
+    for (const r of runs || []) {
+      const f = r.feedback;
+      if (f && f.feeling >= 1 && f.feeling <= 5) {
+        counts[f.feeling - 1]++;
+        total++;
+      }
+    }
+    if (!total) return empty(ctx, w, h, 'Sin respuestas todavía');
+
+    const pad = { l: 32, r: 12, t: 22, b: 30 };
+    const cw = w - pad.l - pad.r;
+    const ch = h - pad.t - pad.b;
+    const max = Math.max(1, ...counts);
+    const colors = [RED, '#f2b07e', GOLD, '#b7e3a1', GREEN];
+
+    ctx.font = '10px ' + FONT;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const steps = Math.min(4, max);
+    for (let i = 0; i <= steps; i++) {
+      const y = pad.t + ch * i / steps;
+      ctx.strokeStyle = GRID;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + cw, y);
+      ctx.stroke();
+      ctx.fillStyle = MUTED;
+      ctx.fillText(String(Math.round(max * (1 - i / steps))), pad.l - 6, y);
+    }
+
+    const gap = Math.max(8, cw * 0.04);
+    const bw = (cw - gap * 4) / 5;
+    counts.forEach((v, i) => {
+      const x = pad.l + i * (bw + gap);
+      const bh = v ? Math.max(4, ch * v / max) : 0;
+      if (bh) {
+        ctx.fillStyle = colors[i];
+        roundRect(ctx, x, pad.t + ch - bh, bw, bh, Math.min(5, bw / 3));
+        ctx.fill();
+      }
+      ctx.fillStyle = v ? TEXT : MUTED;
+      ctx.font = '700 11px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(String(v), x + bw / 2, pad.t + ch - bh - 4);
+      ctx.fillStyle = MUTED;
+      ctx.font = '10px ' + FONT;
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${i + 1}★`, x + bw / 2, pad.t + ch + 8);
+    });
+
+    ctx.fillStyle = MUTED;
+    ctx.font = '9.5px ' + UI;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${total} respuesta${total === 1 ? '' : 's'}`, w - pad.r, 4);
+  }
+
+  /* Dificultad percibida: barras horizontales. */
+  function difficulty(canvas, runs) {
+    const counts = { easy: 0, fair: 0, hard: 0 };
+    for (const r of runs || []) {
+      const f = r.feedback;
+      if (f && counts[f.difficulty] != null) counts[f.difficulty]++;
+    }
+    const items = [
+      { label: 'Fácil', value: counts.easy },
+      { label: 'Justo', value: counts.fair },
+      { label: 'Difícil', value: counts.hard }
+    ];
+    if (items.every(i => !i.value)) {
+      const { ctx, w, h } = setup(canvas);
+      return empty(ctx, w, h, 'Sin respuestas todavía');
+    }
+    hbars(canvas, items, GOLD);
+  }
+
+  window.DKCharts = { scores, results, hurts, funnel, feelings, difficulty };
 })();
