@@ -25,6 +25,19 @@
   const FEELING_LABELS = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Genial'];
   const SURVEY_PREF_KEY = 'donkiko_survey_autoshow';
 
+  const RANKING_TIMEOUT_MS = 9000;
+  const RANKING_REFRESH_MS = 30000;
+
+  const rankingConfig = window.DK_CONFIG || {};
+  const rankingUrl = String(rankingConfig.supabaseUrl || '').replace(/\/+$/, '');
+  const rankingKey = String(rankingConfig.supabaseKey || '');
+  const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
+  const rankingEnabled = !!(rankingUrl && rankingKey);
+
+  const supabase = window.supabase
+    ? window.supabase.createClient(rankingUrl, rankingKey)
+    : null;
+
   const $ = id => document.getElementById(id);
   const frame = $('gameFrame');
   const state = {
@@ -34,6 +47,12 @@
     muted: false,
     connected: false,
     storageOk: true,
+    playerName: '',
+    auth: {
+      user: null,
+      profile: null,
+      loading: false
+    },
     surveyRunId: null,
     surveyAuto: false,
     surveyFeeling: 0,
@@ -43,6 +62,7 @@
   let log = [];
   let toastTimer = null;
   let resizeTimer = null;
+  let nameHintShown = false;
 
   /* ---------- Utilidades ---------- */
   const now = () => Date.now();
@@ -77,6 +97,297 @@
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  /* ---------- Autenticación (Supabase Auth) ---------- */
+  function isAuthenticated() {
+    return !!(state.auth.user && supabase);
+  }
+
+  async function loadProfile(userId, email = '') {
+    if (!supabase || !userId) return null;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('alias')
+        .eq('id', userId)
+        .single();
+      if (data) return data;
+      const alias = email ? email.split('@')[0] : 'usuario';
+      const { data: inserted, error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: userId, alias })
+        .select('alias')
+        .single();
+      if (insertError) {
+        console.warn('No se pudo crear perfil:', insertError);
+        return { alias };
+      }
+      return inserted;
+    } catch (e) {
+      console.warn('Perfil:', e);
+      const alias = email ? email.split('@')[0] : 'usuario';
+      return { alias };
+    }
+  }
+
+  async function initAuth() {
+    if (!supabase) {
+      state.auth.loading = false;
+      updateAuthUI();
+      return;
+    }
+    state.auth.loading = true;
+    updateAuthUI();
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        state.auth.user = null;
+        state.auth.profile = null;
+      } else {
+        state.auth.user = user;
+        state.auth.profile = await loadProfile(user.id, user.email);
+      }
+    } catch (e) {
+      console.warn('Auth init:', e);
+      state.auth.user = null;
+      state.auth.profile = null;
+    } finally {
+      state.auth.loading = false;
+      updateAuthUI();
+    }
+  }
+
+  function subscribeAuth() {
+    if (!supabase) return;
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        state.auth.user = session?.user ?? null;
+        state.auth.profile = session?.user ? await loadProfile(session.user.id, session.user.email) : null;
+      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        state.auth.user = null;
+        state.auth.profile = null;
+      }
+      updateAuthUI();
+    });
+  }
+
+  async function signUp(email, password, alias) {
+    if (!supabase) throw new Error('Supabase no disponible');
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { alias } }
+    });
+    if (error) throw error;
+    if (data.user) {
+      state.auth.user = data.user;
+      state.auth.profile = { alias };
+    }
+    updateAuthUI();
+    return data;
+  }
+
+  async function signIn(email, password) {
+    if (!supabase) throw new Error('Supabase no disponible');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) {
+      state.auth.user = data.user;
+      state.auth.profile = await loadProfile(data.user.id, data.user.email);
+    }
+    updateAuthUI();
+    return data;
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    state.auth.user = null;
+    state.auth.profile = null;
+    updateAuthUI();
+  }
+
+  function updateAuthUI() {
+    const userEl = $('authUser');
+    const guestEl = $('authGuest');
+    const aliasEl = $('authUserAlias');
+    if (!userEl || !guestEl || !aliasEl) return;
+
+    if (isAuthenticated() && state.auth.profile) {
+      userEl.hidden = false;
+      guestEl.hidden = true;
+      aliasEl.textContent = state.auth.profile.alias || state.auth.user.email;
+    } else {
+      userEl.hidden = true;
+      guestEl.hidden = false;
+    }
+
+    const nameInput = $('playerName');
+    if (nameInput) {
+      if (isAuthenticated() && state.auth.profile) {
+        nameInput.value = state.auth.profile.alias;
+        nameInput.disabled = true;
+      } else {
+        nameInput.disabled = false;
+      }
+    }
+  }
+
+  function currentPlayerNameForRanking() {
+    if (isAuthenticated() && state.auth.profile) {
+      return state.auth.profile.alias;
+    }
+    return currentPlayerName();
+  }
+
+  /* ---------- Ranking global (Supabase) ---------- */
+  function normalizeName(value) {
+    return Array.from(String(value || '').trim()).slice(0, 24).join('');
+  }
+
+  function currentPlayerName() {
+    const input = $('playerName');
+    return normalizeName(input ? input.value : state.playerName);
+  }
+
+  function rankingHeaders(extra = {}) {
+    return {
+      apikey: rankingKey,
+      Authorization: `Bearer ${rankingKey}`,
+      ...extra
+    };
+  }
+
+  function rankingEndpoint(path) {
+    return `${rankingUrl}/rest/v1/${path}`;
+  }
+
+  async function rankingFetch(path, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), RANKING_TIMEOUT_MS);
+    try {
+      return await fetch(rankingEndpoint(path), {
+        cache: 'no-store',
+        ...options,
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function rankingErrorMessage(err) {
+    if (err && err.name === 'AbortError') return 'El ranking tardó demasiado en responder.';
+    const message = String((err && err.message) || '');
+    if (message.includes('HTTP 401') || message.includes('HTTP 403')) {
+      return 'No se pudo autenticar con el ranking. Revisá la clave pública.';
+    }
+    if (message.includes('HTTP 404')) {
+      return 'La vista del ranking no está disponible. Revisá el esquema de Supabase.';
+    }
+    if (location.protocol === 'file:') {
+      return 'No se pudo conectar. Si abriste el archivo con doble clic, probá desde Netlify o http://localhost.';
+    }
+    return 'No se pudo cargar el ranking. Revisá tu conexión.';
+  }
+
+  async function loadRanking() {
+    const st = state.ranking;
+    if (!rankingEnabled) {
+      st.loading = false;
+      st.error = 'El ranking global no está configurado.';
+      renderRanking();
+      return;
+    }
+    if (st.loading) return;
+    st.loading = true;
+    st.error = null;
+    renderRanking();
+    try {
+      const params = new URLSearchParams({
+        select: 'player_name,best_score,best_stage,best_time_ms,runs,last_played',
+        order: 'best_score.desc,best_time_ms.asc.nullslast,last_played.asc',
+        limit: String(rankingLimit)
+      });
+      const res = await rankingFetch(`leaderboard?${params}`, { headers: rankingHeaders() });
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const data = await res.json();
+          detail = data.message || data.hint || '';
+        } catch (e) { /* sin cuerpo útil */ }
+        throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
+      }
+      const data = await res.json();
+      st.rows = Array.isArray(data) ? data.filter(row => row && row.player_name) : [];
+      st.error = null;
+      st.loadedAt = now();
+    } catch (err) {
+      console.warn('Ranking global:', err);
+      st.error = rankingErrorMessage(err);
+    } finally {
+      st.loading = false;
+      renderRanking();
+    }
+  }
+
+  function renderRanking() {
+    const st = state.ranking;
+    const body = $('rankingBody');
+    const empty = $('rankingEmpty');
+    const status = $('rankingStatus');
+    const refresh = $('refreshRankingBtn');
+    const section = document.querySelector('.ranking');
+    if (!body || !empty || !status || !refresh) return;
+
+    if (section) section.setAttribute('aria-busy', st.loading ? 'true' : 'false');
+    refresh.disabled = st.loading || !rankingEnabled;
+    refresh.textContent = st.loading ? 'Actualizando…' : 'Actualizar';
+
+    if (st.loading) {
+      status.dataset.state = 'loading';
+      status.textContent = 'Cargando ranking…';
+    } else if (st.error) {
+      status.dataset.state = 'error';
+      status.textContent = st.error;
+    } else if (!rankingEnabled) {
+      status.dataset.state = 'error';
+      status.textContent = 'El ranking global no está configurado.';
+    } else if (!st.rows.length) {
+      status.dataset.state = 'ok';
+      status.textContent = 'Todavía no hay marcas globales.';
+    } else {
+      const time = st.loadedAt
+        ? new Date(st.loadedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : '—';
+      status.dataset.state = 'ok';
+      status.textContent = `${st.rows.length} jugador${st.rows.length === 1 ? '' : 'es'} · actualizado ${time}`;
+    }
+
+    const me = currentPlayerName().toLowerCase();
+    body.innerHTML = st.rows.map((row, index) => {
+      const name = String(row.player_name || '');
+      const isMe = !!me && name.toLowerCase() === me;
+      const rank = index + 1;
+      const rankClass = rank <= 3 ? ` rank-${rank}` : '';
+      return `<tr class="rank-row${rankClass}${isMe ? ' is-you' : ''}">
+        <td class="rank-cell">${rank}</td>
+        <td>${escapeHtml(name)}${isMe ? ' <span class="you-tag">tú</span>' : ''}</td>
+        <td class="num">${fmtNum(row.best_score)}</td>
+        <td class="num">${clamp(Number(row.best_stage) || 0, 0, 3)} / 3</td>
+        <td class="num">${row.best_time_ms != null ? fmtDuration(row.best_time_ms) : '—'}</td>
+        <td class="num">${fmtNum(row.runs)}</td>
+        <td>${row.last_played ? fmtDate(row.last_played) : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    empty.hidden = st.loading || !!st.error || st.rows.length > 0;
+    if (!empty.hidden) {
+      empty.textContent = rankingEnabled
+        ? 'Aún no hay marcas globales. Juega la campaña desde el Nivel 1.'
+        : 'Configurá Supabase en js/config.js para activar el ranking.';
+    }
   }
 
   /* ---------- Persistencia ---------- */
@@ -247,7 +558,85 @@
     state.current = null;
     persist();
     renderAll();
+    submitRun(run);
     return run;
+  }
+
+  async function submitRun(run) {
+    if (!run || run.startStage !== 1) return;
+    if (!['won', 'game_over', 'pau_caught'].includes(run.result)) return;
+    if (!rankingEnabled) return;
+
+    if (!isAuthenticated()) {
+      if (!nameHintShown) {
+        nameHintShown = true;
+        toast('Inicia sesión para enviar tu puntaje al ranking global.');
+      }
+      return;
+    }
+
+    const playerName = currentPlayerNameForRanking();
+    if (!playerName) {
+      if (!nameHintShown) {
+        nameHintShown = true;
+        toast('Tu perfil no tiene alias asignado.');
+      }
+      return;
+    }
+
+    const levels = (Array.isArray(run.levels) ? run.levels : [])
+      .slice(0, 3)
+      .map(lv => ({
+        stage: clamp(Number(lv.stage) || 1, 1, 3),
+        completed: !!lv.completed,
+        timeMs: Math.max(0, Math.round(Number(lv.timeMs) || 0)),
+        hurts: Math.max(0, Math.round(Number(lv.hurts) || 0)),
+        tokens: Math.max(0, Math.round(Number(lv.tokens) || 0))
+      }));
+    if (!levels.length) return;
+
+    const activeTime = levels.reduce((total, lv) => total + lv.timeMs, 0);
+    const payload = {
+      client_run_id: String(run.id).slice(0, 64),
+      user_id: state.auth.user ? state.auth.user.id : null,
+      player_name: playerName,
+      score: clamp(Math.round(Number(run.score) || 0), 0, 100000000),
+      result: run.result,
+      start_stage: clamp(Number(run.startStage) || 1, 1, 3),
+      stage_reached: clamp(Number(run.stageReached) || 1, 1, 3),
+      duration_ms: clamp(Math.round(Number(run.durationMs) || 0), 0, 86400000),
+      active_time_ms: clamp(Math.round(activeTime), 0, 86400000),
+      levels
+    };
+
+    try {
+      const res = await rankingFetch('runs', {
+        method: 'POST',
+        headers: rankingHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        }),
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 409) {
+        toast('Esa partida ya estaba en el ranking global.');
+        loadRanking();
+        return;
+      }
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const data = await res.json();
+          detail = data.message || data.hint || '';
+        } catch (e) { /* sin cuerpo útil */ }
+        throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
+      }
+      toast('Puntaje enviado al ranking global.');
+      loadRanking();
+    } catch (err) {
+      console.warn('Ranking global (envío):', err);
+      toast('No se pudo enviar el puntaje; quedó guardado en el historial local.');
+    }
   }
 
   /* ---------- Telemetría del juego ---------- */
@@ -834,11 +1223,111 @@
   $('exportSurveyBtn').addEventListener('click', exportSurveyCsv);
   $('filterFeedback').addEventListener('change', renderComments);
 
+  /* ---------- Autenticación: UI ---------- */
+  const authPanel = $('authPanel');
+  const authForm = $('authForm');
+  const authTitle = $('authTitle');
+  const authSubmitBtn = $('authSubmitBtn');
+  const authToggleBtn = $('authToggleBtn');
+  const authError = $('authError');
+  const authEmail = $('authEmail');
+  const authPassword = $('authPassword');
+  const authPasswordConfirm = $('authPasswordConfirm');
+  const authAlias = $('authAlias');
+  const authFieldEmail = $('authFieldEmail');
+  const authFieldAlias = $('authFieldAlias');
+  const authFieldConfirm = $('authFieldConfirm');
+  let authMode = 'login';
+
+  function showAuthPanel() {
+    if (!authPanel) return;
+    authPanel.hidden = false;
+    authError.hidden = true;
+    authError.textContent = '';
+    authForm.reset();
+    setAuthMode('login');
+  }
+
+  function hideAuthPanel() {
+    if (!authPanel) return;
+    authPanel.hidden = true;
+    authError.hidden = true;
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    if (!authTitle || !authSubmitBtn || !authToggleBtn) return;
+    if (mode === 'signup') {
+      authTitle.textContent = 'Crear cuenta';
+      authSubmitBtn.textContent = 'Registrarse';
+      authToggleBtn.textContent = '¿Ya tienes cuenta? Inicia sesión';
+      if (authFieldEmail) authFieldEmail.style.display = '';
+      if (authFieldAlias) authFieldAlias.style.display = '';
+      if (authFieldConfirm) authFieldConfirm.style.display = '';
+      authPassword.setAttribute('autocomplete', 'new-password');
+    } else {
+      authTitle.textContent = 'Iniciar sesión';
+      authSubmitBtn.textContent = 'Iniciar sesión';
+      authToggleBtn.textContent = '¿No tienes cuenta? Regístrate';
+      if (authFieldEmail) authFieldEmail.style.display = '';
+      if (authFieldAlias) authFieldAlias.style.display = 'none';
+      if (authFieldConfirm) authFieldConfirm.style.display = 'none';
+      authPassword.setAttribute('autocomplete', 'current-password');
+    }
+  }
+
+  if ($('authSignInBtn')) $('authSignInBtn').addEventListener('click', showAuthPanel);
+  if ($('authSignUpBtn')) $('authSignUpBtn').addEventListener('click', () => { showAuthPanel(); setAuthMode('signup'); });
+  if ($('authCloseBtn')) $('authCloseBtn').addEventListener('click', hideAuthPanel);
+  if (authToggleBtn) authToggleBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+
+  if (authForm) {
+    authForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      if (!supabase) {
+        authError.hidden = false;
+        authError.textContent = 'Supabase no está configurado.';
+        return;
+      }
+      const email = authEmail ? authEmail.value.trim() : '';
+      const password = authPassword ? authPassword.value : '';
+      const alias = authAlias ? authAlias.value.trim() : '';
+      authError.hidden = true;
+      authSubmitBtn.disabled = true;
+      try {
+        if (authMode === 'signup') {
+          if (!alias) throw new Error('El alias es obligatorio');
+          if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
+          if (authPasswordConfirm && authPasswordConfirm.value !== password) throw new Error('Las contraseñas no coinciden');
+          await signUp(email, password, alias);
+          toast('Cuenta creada. Ya puedes aparecer en el ranking.');
+        } else {
+          await signIn(email, password);
+          toast('Sesión iniciada.');
+        }
+        hideAuthPanel();
+      } catch (err) {
+        authError.hidden = false;
+        authError.textContent = err.message || 'Error de autenticación';
+        console.warn('Auth error:', err);
+      } finally {
+        authSubmitBtn.disabled = false;
+      }
+    });
+  }
+
+  if ($('authSignOutBtn')) $('authSignOutBtn').addEventListener('click', async () => {
+    await signOut();
+    toast('Sesión cerrada');
+  });
+
   /* ---------- Arranque ---------- */
   loadRuns();
   updateSurveyPrefBtn();
   renderLog();
   renderAll();
+  initAuth();
+  subscribeAuth();
   window.addEventListener('message', handleGameMessage);
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
