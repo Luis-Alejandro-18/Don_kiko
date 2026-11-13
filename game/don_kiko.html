@@ -103,6 +103,10 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
   const rand = (a, b) => a + Math.random() * (b - a);
   const hitBox = (a,b,ax,ay,bx,by) => Math.abs(ax-bx)<a && Math.abs(ay-by)<b;
   const LEVEL_NAMES = ['','Rescate en el edificio','Escape por las azoteas','Rumbo a las chelas'];
+  // Agregar un nivel = agregar su nombre aquí y su configuración en LEVELS.
+  const TOTAL_LEVELS = LEVEL_NAMES.length - 1;
+  const NUM_WORDS = {1:'Un',2:'Dos',3:'Tres',4:'Cuatro',5:'Cinco',6:'Seis',7:'Siete',8:'Ocho'};
+  const numberWord = n => NUM_WORDS[n] || String(n);
   const keys = {left:false,right:false,up:false,down:false,jump:false,punch:false};
   const sprites={
  kiko:["......BBBBBB......","....BBBBBBBBBB....","...BBBBBBBBBBBB...","..BBBBTTTTBBBBBB..","..BBBTTTTTTBBBBB..",".BBBBTWTWTBBBBBBB",".BBBBTTKTTBBBBBBB","..BBBBTTTTBBBBBBB","..BBBBBBBBBBBBBB.",".BBBBBBBBBBBBBB..","BBBBBBBBBBBBBBBB..","BB.BBBBBBBBBB.BBB.","T...BBBBBBBB...TT.","....BBBBBBBB......","...BBBB..BBBB.....","..BBBB....BBBB....","..BBB......BBB...."],
@@ -136,7 +140,6 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   }
   setInterval(sendSnapshot,250);
 
-  const worldWidths = {1:1000,2:1580,3:2470};
   const floors = [{y:621,m:0},{y:521,m:-.027},{y:418,m:.026},{y:314,m:-.026},{y:210,m:.027},{y:109,m:0}];
   const ladders = [856,140,856,140,856];
   const fy = (n,x) => floors[n].y + floors[n].m*(x-500);
@@ -184,7 +187,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   function updateHud(){
     $('score').textContent=String(score).padStart(6,'0');
     $('lives').textContent=lives>0?'♥ '.repeat(lives).trim():'—';
-    $('levelNumber').textContent=`${stage} / 3`;
+    $('levelNumber').textContent=`${stage} / ${TOTAL_LEVELS}`;
     $('levelName').textContent=LEVEL_NAMES[stage];
     $('best').textContent=String(Math.max(best,score)).padStart(6,'0');
     $('resumeBtn').disabled=phase==='playing';
@@ -198,24 +201,10 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   function initializeStage(n){
     stage=n;objects=[];particles=[];notices=[];warnings=[];tokens=[];spawnTimer=-1.2;spawnCount=0;elapsed=0;camera=0;shake=0;levelScore=score;companionTip=0;
     pauChase={active:false,x:0};lostToPau=false;pauRestartCountdown=0;surveyHold=false;
-    if(stage===1){player=playerAt(118,fy(0,118));friend={x:823,bottom:102}; checkpoint=118;}
-    if(stage===2){player=playerAt(102,roofs[0].y);friend={x:48,bottom:roofs[0].y};checkpoint=102;
-      // These are persistent. They never disappear unless punched or left behind.
-      objects.push({x:513,y:roofs[1].y-16,r:16,type:'barrel',breakable:true,static:true,area:1});
-      objects.push({x:(roofs[3].a+roofs[3].b)/2,y:roofs[3].y-22,r:22,type:'dog',ground:roofs[3].y,breakable:false,static:true,area:3}); // Perro al centro de la azotea
-      objects.push({x:1357,y:roofs[4].y-16,r:16,type:'barrel',breakable:true,static:true,area:4});
-      tokens=[{x:232,y:roofs[0].y-52},{x:665,y:roofs[2].y-54},{x:982,y:roofs[3].y-56},{x:1456,y:roofs[4].y-52}];
-    }
-    if(stage===3){player=playerAt(105,STREET_Y);friend={x:51,bottom:STREET_Y};checkpoint=105;
-      // Carefully separated, visible obstacles. No random invisible barrels.
-      objects.push({x:455,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true});
-      objects.push({x:1149,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true});
-      objects.push({x:945,y:STREET_Y-22,r:22,type:'dog',ground:STREET_Y,breakable:false,static:true});
-      objects.push({x:1750,y:STREET_Y-28,r:27,vx:48,type:'car',ground:STREET_Y,breakable:false,bounds:[1725,1785]});
-      objects.push({x:2217,y:STREET_Y-22,r:22,type:'crate',breakable:true,static:true});
-      tokens=[{x:568,y:STREET_Y-54},{x:1090,y:STREET_Y-56},{x:1610,y:scaffolds[0].y-53},{x:2297,y:STREET_Y-54}];
-    }
-    updateHud();flash(stage===1?'¡A rescatar a JuanMa!':stage===2?'¡Escapen por los techos!':'¡La cantina los espera!',2.8);
+    const cfg=levelOf(stage), setup=cfg.start();
+    player=setup.player;friend=setup.friend;checkpoint=setup.checkpoint;
+    objects=setup.objects;tokens=setup.tokens;
+    updateHud();flash(cfg.flash,2.8);
   }
   function begin(level=1){
     score=0;lives=3;time=0;initializeStage(level);phase='playing';clearKeys();updateHud();chime();
@@ -224,7 +213,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   }
   function proceed(){
     if(phase==='menu'||phase==='lost'||phase==='won'){begin(1);return;}
-    if(phase==='intermission'){initializeStage(Math.min(3,stage+1));phase='playing';updateHud();chime();return;}
+    if(phase==='intermission'){initializeStage(Math.min(TOTAL_LEVELS,stage+1));phase='playing';updateHud();chime();return;}
     if(phase==='paused'){phase='playing';updateHud();return;}
     if(phase==='playing')flash('¡Sigue avanzando!',1);
   }
@@ -236,7 +225,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   }
   function jump(){
     if(phase!=='playing'||player.climb)return;
-    if(stage===1){if(player.air)return;player.air=true;player.vy=-425;}
+    if(levelOf(stage).jump==='stairs'){if(player.air)return;player.air=true;player.vy=-425;}
     else {if(!player.grounded)return;player.grounded=false;player.vy=-450;}
     sound(390,.11);
   }
@@ -263,12 +252,11 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     emit('hurt',{cause:fall?'fall':'hazard',stage,lives,x:Math.round(player.x)});
     if(lives<=0){lives=0;phase='lost';saveScore();updateHud();emit('game_over',{stage,score,cause:fall?'fall':'hazard'});return;}
     if(fall){
-      if(stage===2){player.x=checkpoint;player.bottom=roofAt(checkpoint)?.y??roofs[0].y;friend.x=player.x-53;friend.bottom=player.bottom;}
-      else if(stage===3){player.x=checkpoint;player.bottom=STREET_Y;friend.x=player.x-55;friend.bottom=STREET_Y;}
+      levelOf(stage).respawn(player,friend,checkpoint);
       player.vy=0;player.grounded=true;player.air=false;
     }else{
       player.inv=2.1;player.vy=-210;
-      if(stage===1)player.air=true;else player.grounded=false;
+      if(levelOf(stage).airKnockback)player.air=true;else player.grounded=false;
     }
     player.inv=2.1;flash(fall?'¡Cuidado con el hueco!':'¡Aguas con los obstáculos!',1.8);updateHud();
   }
@@ -276,11 +264,11 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     if(phase!=='playing')return;
     let bonus=1000+Math.max(0,Math.round(500-elapsed*2));
     score+=bonus;saveScore();chime();
-    if(stage<3){phase='intermission';}
+    if(stage<TOTAL_LEVELS){phase='intermission';}
     else phase='won';
     burst(player.x,player.bottom-45,'#ffe08f',26);updateHud();clearKeys();
     emit('stage_complete',{stage,score,bonus,elapsed:Math.round(elapsed*10)/10});
-    if(stage===3)emit('won',{stage,score,totalTime:Math.round(time*10)/10});
+    if(stage===TOTAL_LEVELS)emit('won',{stage,score,totalTime:Math.round(time*10)/10});
   }
   function spawnStageOne(){
     spawnCount++;
@@ -367,7 +355,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   function roofGrounds(){return roofs;}
   function updatePlatformPlayer(dt,segments,gravity,speed){
     const p=player,dir=Number(keys.right)-Number(keys.left),oldX=p.x;
-    if(dir){p.face=dir;p.x=clamp(p.x+dir*speed*dt,38,worldWidths[stage]-32);}
+    if(dir){p.face=dir;p.x=clamp(p.x+dir*speed*dt,38,levelOf(stage).width-32);}
     const old=p.bottom;
     if(p.grounded){
       const support=segments.find(s=>p.x>=s.a+5&&p.x<=s.b-5&&Math.abs(p.bottom-s.y)<17);
@@ -384,7 +372,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
         }
       }
     }
-    if(stage===3){
+    if(levelOf(stage).crateBlocks){
       // No se puede atravesar ni saltar la caja: primero hay que golpearla.
       const c=objects.find(o=>o.type==='crate'&&!o.dead);
       if(c){
@@ -402,10 +390,11 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     const targetX=p.x-53;
     // JuanMa follows at a slightly faster pace to prevent impossible soft locks.
     // He automatically steps over hazards offscreen instead of getting stuck forever.
-    const pace=stage===2?288:300;
+    const comp=levelOf(stage).companion;
+    const pace=comp.pace;
     const diff=targetX-friend.x;
     friend.x+=clamp(diff,-pace*dt,pace*dt);
-    if(stage===2){
+    if(comp.mode==='roof'){
       const roof=roofAt(friend.x);
       let y=roof?roof.y:roofs.reduce((best,r)=>Math.abs(r.a-friend.x)<Math.abs(best.a-friend.x)?r:best,roofs[0]).y-10;
       friend.bottom+=(y-friend.bottom)*Math.min(1,8*dt);
@@ -515,10 +504,9 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     if(phase!=='playing')return;
     time+=dt;elapsed+=dt;shake=Math.max(0,shake-dt);
     updatePlayerStatus(dt);
-    if(stage===1)updateStageOne(dt);
-    if(stage===2)updateStageTwo(dt);
-    if(stage===3)updateStageThree(dt);
-    if(stage!==1)camera=clamp(player.x-330,0,worldWidths[stage]-W);
+    const cfg=levelOf(stage);
+    if(cfg.update)cfg.update(dt);
+    if(cfg.camera)camera=clamp(player.x-330,0,cfg.width-W);
     if(Math.floor(time*5)%15===0&&score>best)saveScore();
   }
 
@@ -621,6 +609,9 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     rect(776,33,103,68,'#1d3446');sprite(sprites.juan,826,100,3.1);for(let x=778;x<877;x+=16)rect(x,33,4,67,'#97b4bd');speech('¡KIKO, AYUDA!',774,5,170);
     if(player.floor<5&&!player.air&&!player.climb&&Math.abs(player.x-ladders[player.floor])<75)
       txt('↑ SUBIR',ladders[player.floor],fy(player.floor,ladders[player.floor])-66,13,'#fff0b2','center');
+    for(const o of objects)drawObject(o);
+    drawCharacters();
+    for(const a of particles)rect(a.x,a.y,5,5,a.color);
   }
   function roof(x1,x2,y,color){
     const top=y, w=x2-x1;
@@ -663,8 +654,9 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     drawCharacters();
     for(const a of particles)rect(a.x,a.y,5,5,a.color);
     ctx.restore();
-    drawProgressBar(player.x/1490,'AZOTEAS');
-    txt('PUÑETAZO: J  ·  SALTO: ESPACIO  ·  OBJETOS AVISADOS',445,63,13,'#e6eac1');
+    const cfg=levelOf(stage);
+    drawProgressBar(player.x/cfg.progress.end,cfg.progress.label);
+    txt(cfg.hint,445,63,13,'#e6eac1');
   }
   function streetBackground(){
     night();rect(0,589,W,75,'#313a4b');rect(0,589,W,12,'#c0b9a2');
@@ -712,16 +704,128 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     drawCharacters();
     for(const a of particles)rect(a.x,a.y,5,5,a.color);
     ctx.restore();
-    drawProgressBar(player.x/2360,'CANTINA');
-    txt(pauChase.active?'¡ESCAPA DE PAU!  ·  SU CONTACTO ES GAME OVER':'GOLPEA LAS CAJAS  ·  ESQUIVA LOS PELIGROS',440,63,13,'#e6eac1');
+    const cfg=levelOf(stage);
+    drawProgressBar(player.x/cfg.progress.end,cfg.progress.label);
+    txt(typeof cfg.hint==='function'?cfg.hint():cfg.hint,440,63,13,'#e6eac1');
   }
+  // ---------- Configuración de niveles ----------
+  // Cada nivel declara arranque, física, acompañante, dibujo y meta.
+  // Agregar un nivel nuevo = agregar su nombre en LEVEL_NAMES y una entrada aquí.
+  const LEVELS = {
+    1: {
+      width: 1000,
+      camera: false,
+      jump: 'stairs',
+      airKnockback: true,
+      showCompanion: false,
+      showFloor: true,
+      mission: 'MISIÓN: RESCATAR A JUANMA',
+      flash: '¡A rescatar a JuanMa!',
+      start(){
+        return {player:playerAt(118,fy(0,118)),friend:{x:823,bottom:102},checkpoint:118,objects:[],tokens:[]};
+      },
+      respawn(){}, // En el nivel 1 no hay caídas: se reaparece en el sitio.
+      update: updateStageOne,
+      draw: drawStageOne,
+      progress: null,
+      hint: null,
+      intermission: {
+        title: '¡JUANMA RESCATADO!',
+        lines: score => [
+          'Don Kiko liberó a su mejor amigo.',
+          '¡Pero Pau ya viene detrás de ellos!',
+          'Siguiente: NIVEL 2 · ESCAPE POR LAS AZOTEAS',
+          `Puntuación acumulada: ${score}`
+        ]
+      }
+    },
+    2: {
+      width: 1580,
+      camera: true,
+      jump: 'platform',
+      airKnockback: false,
+      showCompanion: true,
+      showFloor: false,
+      mission: 'MISIÓN: ESCAPAR JUNTOS POR LOS TECHOS',
+      flash: '¡Escapen por los techos!',
+      start(){
+        return {
+          player: playerAt(102,roofs[0].y),
+          friend: {x:48,bottom:roofs[0].y},
+          checkpoint: 102,
+          // Persistentes: no desaparecen salvo que se golpeen o queden atrás.
+          objects: [
+            {x:513,y:roofs[1].y-16,r:16,type:'barrel',breakable:true,static:true,area:1},
+            {x:(roofs[3].a+roofs[3].b)/2,y:roofs[3].y-22,r:22,type:'dog',ground:roofs[3].y,breakable:false,static:true,area:3}, // Perro al centro de la azotea
+            {x:1357,y:roofs[4].y-16,r:16,type:'barrel',breakable:true,static:true,area:4}
+          ],
+          tokens: [{x:232,y:roofs[0].y-52},{x:665,y:roofs[2].y-54},{x:982,y:roofs[3].y-56},{x:1456,y:roofs[4].y-52}]
+        };
+      },
+      respawn(player,friend,checkpoint){
+        player.x=checkpoint;player.bottom=roofAt(checkpoint)?.y??roofs[0].y;
+        friend.x=player.x-53;friend.bottom=player.bottom;
+      },
+      companion: {mode:'roof',pace:288},
+      update: updateStageTwo,
+      draw: drawStageTwo,
+      progress: {end:1490,label:'AZOTEAS'},
+      hint: 'PUÑETAZO: J  ·  SALTO: ESPACIO  ·  OBJETOS AVISADOS',
+      intermission: {
+        title: '¡AZOTEAS SUPERADAS!',
+        lines: score => [
+          'Los dos amigos lograron salir de las azoteas.',
+          'Ahora deben cruzar el barrio sin que Pau los alcance.',
+          'Siguiente: NIVEL 3 · RUMBO A LAS CHELAS',
+          `Puntuación acumulada: ${score}`
+        ]
+      }
+    },
+    3: {
+      width: 2470,
+      camera: true,
+      jump: 'platform',
+      airKnockback: false,
+      showCompanion: true,
+      showFloor: false,
+      crateBlocks: true,
+      mission: 'MISIÓN: LLEGAR JUNTOS A LA CANTINA',
+      flash: '¡La cantina los espera!',
+      start(){
+        return {
+          player: playerAt(105,STREET_Y),
+          friend: {x:51,bottom:STREET_Y},
+          checkpoint: 105,
+          // Separados y visibles: sin barriles invisibles aleatorios.
+          objects: [
+            {x:455,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true},
+            {x:1149,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true},
+            {x:945,y:STREET_Y-22,r:22,type:'dog',ground:STREET_Y,breakable:false,static:true},
+            {x:1750,y:STREET_Y-28,r:27,vx:48,type:'car',ground:STREET_Y,breakable:false,bounds:[1725,1785]},
+            {x:2217,y:STREET_Y-22,r:22,type:'crate',breakable:true,static:true}
+          ],
+          tokens: [{x:568,y:STREET_Y-54},{x:1090,y:STREET_Y-56},{x:1610,y:scaffolds[0].y-53},{x:2297,y:STREET_Y-54}]
+        };
+      },
+      respawn(player,friend,checkpoint){
+        player.x=checkpoint;player.bottom=STREET_Y;
+        friend.x=player.x-55;friend.bottom=STREET_Y;
+      },
+      companion: {mode:'street',pace:300},
+      update: updateStageThree,
+      draw: drawStageThree,
+      progress: {end:2360,label:'CANTINA'},
+      hint: () => pauChase.active?'¡ESCAPA DE PAU!  ·  SU CONTACTO ES GAME OVER':'GOLPEA LAS CAJAS  ·  ESQUIVA LOS PELIGROS'
+    }
+  };
+  const levelOf = n => LEVELS[n] || LEVELS[1];
   function drawProgressBar(percent,label){
     rect(19,61,280,13,'#071527');rect(19,61,280*clamp(percent,0,1),13,'#e8c278');
     ctx.strokeStyle='#a7becd';ctx.strokeRect(19,61,280,13);
     txt(label,19,55,13,'#e2eeef');txt(`${Math.round(clamp(percent,0,1)*100)}%`,307,73,14,'#f8e3b4');
   }
   function drawCharacters(){
-    if(stage>1){sprite(sprites.juan,friend.x,friend.bottom,3.05);
+    if(levelOf(stage).showCompanion){sprite(sprites.juan,friend.x,friend.bottom,3.05);
       if(player.x-friend.x>145)txt('¡ESPÉRAME!',friend.x,friend.bottom-62,12,'#ffe9a9','center');
     }
     if(player.inv===0||Math.floor(player.inv*10)%2===0){
@@ -738,9 +842,9 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     txt(`NIVEL ${stage} · ${LEVEL_NAMES[stage].toUpperCase()}`,218,26,15,'#d3e7f4');
     txt(`PUNTOS ${String(score).padStart(6,'0')}`,659,26,16,'#edf3ff');
     txt('♥'.repeat(lives),979,26,19,'#ff959b','right');
-    if(stage===1){txt(`PISO ${player.floor}/5`,18,64,14,'#f8df9b');}
+    if(levelOf(stage).showFloor){txt(`PISO ${player.floor}/5`,18,64,14,'#f8df9b');}
     rect(0,665,W,35,'#061628e8');
-    txt(stage===1?'MISIÓN: RESCATAR A JUANMA':stage===2?'MISIÓN: ESCAPAR JUNTOS POR LOS TECHOS':'MISIÓN: LLEGAR JUNTOS A LA CANTINA',19,689,17,'#fff0be');
+    txt(levelOf(stage).mission,19,689,17,'#fff0be');
     if(notices.length){const n=notices[notices.length-1];ctx.globalAlpha=Math.min(1,n.t*2);
       txt(n.text,500,111,19,'#ffe7b0','center');ctx.globalAlpha=1;}
   }
@@ -752,28 +856,24 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   }
   function drawOverlays(){
     if(phase==='menu')overlay('DON KIKO: LA AVENTURA',[
-      'Tres niveles para llegar con JuanMa a la cantina.',
-      '1 · Rescate en el edificio',
-      '2 · Escape por las azoteas',
-      '3 · Rumbo a las chelas'
+      `${numberWord(TOTAL_LEVELS)} niveles para llegar con JuanMa a la cantina.`,
+      ...Object.keys(LEVELS).map(n=>`${n} · ${LEVEL_NAMES[n]}`)
     ],'#ffe19b','ENTER O ▶ JUGAR');
     if(phase==='paused')overlay('PAUSA',[
       'JuanMa todavía tiene ganas de salir.',
       'Pulsa P, ENTER o Reanudar para continuar.'
     ],'#b2daf0','ENTER / REANUDAR');
     if(phase==='intermission'){
-      const isOne=stage===1;
-      overlay(isOne?'¡JUANMA RESCATADO!':'¡AZOTEAS SUPERADAS!',isOne?[
-        'Don Kiko liberó a su mejor amigo.',
-        '¡Pero Pau ya viene detrás de ellos!',
-        'Siguiente: NIVEL 2 · ESCAPE POR LAS AZOTEAS',
-        `Puntuación acumulada: ${score}`
-      ]:[
-        'Los dos amigos lograron salir de las azoteas.',
-        'Ahora deben cruzar el barrio sin que Pau los alcance.',
-        'Siguiente: NIVEL 3 · RUMBO A LAS CHELAS',
-        `Puntuación acumulada: ${score}`
-      ],'#a7edbe','ENTER / SIGUIENTE NIVEL');
+      const nextLevel=levelOf(stage).intermission;
+      if(nextLevel){
+        overlay(nextLevel.title,typeof nextLevel.lines==='function'?nextLevel.lines(score):nextLevel.lines,'#a7edbe','ENTER / SIGUIENTE NIVEL');
+      }else{
+        overlay('¡NIVEL SUPERADO!',[
+          'Don Kiko y JuanMa avanzaron juntos.',
+          `Siguiente: NIVEL ${stage+1} · ${(LEVEL_NAMES[stage+1]||'').toUpperCase()}`,
+          `Puntuación acumulada: ${score}`
+        ],'#a7edbe','ENTER / SIGUIENTE NIVEL');
+      }
     }
     if(phase==='lost')overlay(lostToPau?'¡PAU LOS ATRAPÓ!':'¡GAME OVER!',[
       lostToPau?'¡Pau alcanzó a Don Kiko! ¡Perdiste los 3 corazones!':'Don Kiko se quedó sin vidas.',
@@ -784,16 +884,13 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     if(phase==='won')overlay('¡MISIÓN CUMPLIDA!',[
       '¡Don Kiko y JuanMa llegaron a la cantina!',
       'Después de tantos barriles, ¡las chelas se ganaron!',
-      'FIN · TRES NIVELES COMPLETADOS',
+      `FIN · ${numberWord(TOTAL_LEVELS).toUpperCase()} NIVELES COMPLETADOS`,
       `Puntuación final: ${score}`
     ],'#ffe2a5','ENTER / JUGAR OTRA VEZ');
   }
   function render(){
     ctx.save();if(shake>0)ctx.translate(rand(-4,4),rand(-3,3));
-    if(stage===1){drawStageOne();for(const o of objects)drawObject(o);drawCharacters();
-      for(const a of particles)rect(a.x,a.y,5,5,a.color);}
-    else if(stage===2)drawStageTwo();
-    else drawStageThree();
+    levelOf(stage).draw();
     drawHud();ctx.restore();drawOverlays();
   }
   function frame(ms){const dt=last?Math.min(.035,(ms-last)/1000):.016;last=ms;update(dt);render();requestAnimationFrame(frame);}
@@ -829,7 +926,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   window.addEventListener('message',e=>{
     const d=e.data;
     if(!d||d.source!=='dashboard')return;
-    if(d.command==='start')begin(clamp(Number(d.level)||1,1,3));
+    if(d.command==='start')begin(clamp(Number(d.level)||1,1,TOTAL_LEVELS));
     else if(d.command==='toggle'){if(phase==='playing'||phase==='paused')togglePause();}
     else if(d.command==='pause'){if(phase==='playing')togglePause();}
     else if(d.command==='resume'){if(phase==='paused')togglePause();}
