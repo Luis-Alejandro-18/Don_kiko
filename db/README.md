@@ -31,6 +31,24 @@ las políticas RLS, la vista y los permisos.
 4. Volver a ejecutar `schema.sql` también rellena los perfiles que falten de
    cuentas creadas antes del trigger.
 
+## 2.2 Migraciones
+
+Si la base ya existía antes de la campaña de 5 niveles, ejecuta una vez
+[`migrations/2026-11-12_levels_1_5.sql`](./migrations/2026-11-12_levels_1_5.sql)
+en el SQL Editor. Amplía los límites de `runs` y de la política de inserción a
+`1..5`, y recrea la vista `leaderboard`. Es idempotente.
+
+Comprobación rápida:
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'public.runs'::regclass
+  and conname in ('runs_start_stage_range', 'runs_stage_reached_range');
+```
+
+Debe mostrar `between 1 and 5` en ambas.
+
 ## 3. Probar la base
 
 Desde el SQL Editor (como propietario, sin RLS):

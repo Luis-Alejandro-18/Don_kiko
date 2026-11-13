@@ -4,7 +4,7 @@
 
 -- Identidad: auth.users de Supabase Auth + public.profiles para alias público.
 -- Ranking de campaña: solo partidas iniciadas en el nivel 1 (`start_stage = 1`).
--- Las partidas de prueba (nivel 2/3) no entran en ese ranking.
+-- Las partidas de prueba (nivel 2 a 5) no entran en ese ranking.
 
 -- Seguridad:
 --   - `anon` y `authenticated` solo pueden leer e insertar runs.
@@ -105,13 +105,13 @@ create table if not exists public.runs (
   constraint runs_player_name_trimmed check (player_name = btrim(player_name)),
   constraint runs_score_range check (score between 0 and 100000000),
   constraint runs_result_valid check (result in ('won', 'game_over', 'pau_caught', 'abandoned')),
-  constraint runs_start_stage_range check (start_stage between 1 and 3),
-  constraint runs_stage_reached_range check (stage_reached between 1 and 3),
+  constraint runs_start_stage_range check (start_stage between 1 and 5),
+  constraint runs_stage_reached_range check (stage_reached between 1 and 5),
   constraint runs_duration_range check (duration_ms between 0 and 86400000),
   constraint runs_active_time_range check (active_time_ms between 0 and 86400000),
   constraint runs_levels_array check (
     jsonb_typeof(levels) = 'array'
-    and jsonb_array_length(levels) between 1 and 3
+    and jsonb_array_length(levels) between 1 and 5
   )
 );
 
@@ -142,12 +142,12 @@ create policy runs_insert_public on public.runs
     and player_name = btrim(player_name)
     and score between 0 and 100000000
     and result in ('won', 'game_over', 'pau_caught', 'abandoned')
-    and start_stage between 1 and 3
-    and stage_reached between 1 and 3
+    and start_stage between 1 and 5
+    and stage_reached between 1 and 5
     and duration_ms between 0 and 86400000
     and active_time_ms between 0 and 86400000
     and jsonb_typeof(levels) = 'array'
-    and jsonb_array_length(levels) between 1 and 3
+    and jsonb_array_length(levels) between 1 and 5
     -- Si hay user_id, debe ser el del usuario autenticado.
     and (user_id is null or auth.uid() = user_id)
   );
