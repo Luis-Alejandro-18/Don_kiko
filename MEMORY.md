@@ -242,3 +242,11 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `mailer_autoconfirm: true` confirmado en Supabase; registro devuelve sesión.
 - [x] Verificado con Chrome headless sobre el sitio desplegado: badge "Menú", ranking con 1 fila, modal de login/registro abre, login real deja el alias en la cabecera y la campaña desde Nivel 1 genera payload con `start_stage: 1` y `user_id`.
 - [ ] Limpiar datos de prueba: usuario `agente.prueba.mwcy13bd@example.com` y `delete from public.runs where client_run_id = 'test-agente-mwcy13bd';`.
+
+### Fase 7 (niveles como configuración) — 2026-11-12
+
+- [x] `game/don_kiko.html`: los 3 niveles pasan a una tabla `LEVELS` (arranque, física, acompañante, misión, dibujo, meta y textos); `TOTAL_LEVELS` se deriva de `LEVEL_NAMES`.
+- [x] Se eliminaron los `if (stage===1/2/3)` de `initializeStage`, `update`, `render`, `jump`, `hurt`, `completeStage`, `updatePlatformPlayer`, `updateCompanion`, y los `3` fijos del HUD.
+- [x] Sin cambios de jugabilidad: una prueba automatizada comparó estado inicial, secuencia de campaña, reaparición y salto contra `main`; salió idéntica en los 3 niveles.
+- [x] Verificado en Chrome headless: los 3 niveles arrancan, el HUD muestra `N / 3`, el personaje se mueve y no hay errores de consola.
+- [ ] Para agregar un nivel: añadir su nombre en `LEVEL_NAMES` y su entrada en `LEVELS` (con `update`, `draw`, `start`, `respawn`).
