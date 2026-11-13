@@ -135,7 +135,8 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
       cratePresent:objects.some(o=>o.type==='crate'),
       elapsed:Math.round(elapsed*10)/10,
       totalTime:Math.round(time*10)/10,
-      levelName:LEVEL_NAMES[stage]
+      levelName:LEVEL_NAMES[stage],
+      totalLevels:TOTAL_LEVELS
     });
   }
   setInterval(sendSnapshot,250);
@@ -945,7 +946,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   });
   if(new URLSearchParams(location.search).has('embed'))document.body.classList.add('embed');
   initializeStage(1);phase='menu';updateHud();requestAnimationFrame(frame);
-  emit('ready',{phase,stage});
+  emit('ready',{phase,stage,totalLevels:TOTAL_LEVELS});
 })();
 
 </script>

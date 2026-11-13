@@ -250,3 +250,14 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] Sin cambios de jugabilidad: una prueba automatizada comparó estado inicial, secuencia de campaña, reaparición y salto contra `main`; salió idéntica en los 3 niveles.
 - [x] Verificado en Chrome headless: los 3 niveles arrancan, el HUD muestra `N / 3`, el personaje se mueve y no hay errores de consola.
 - [ ] Para agregar un nivel: añadir su nombre en `LEVEL_NAMES` y su entrada en `LEVELS` (con `update`, `draw`, `start`, `respawn`).
+
+### Fase 8 (panel y base listos para 5 niveles) — 2026-11-12
+
+- [x] `js/config.js`: `totalLevels` y `levelWidths` como fuente única del panel.
+- [x] `js/dashboard.js`: `TOTAL_LEVELS` sustituye los `3` fijos (ranking, KPIs, historial, encuesta, envío y vista en vivo); `.slice(0,3)` pasa a `.slice(0,TOTAL_LEVELS)`.
+- [x] `js/charts.js`: embudo y vidas por nivel se generan con `LEVEL_STAGES`.
+- [x] `index.html`: el título muestra el total desde `#totalLevelsLabel`.
+- [x] El juego emite `totalLevels` en `ready` y `snapshot`; el panel avisa si no coincide con la config.
+- [x] `db/schema.sql` y `db/migrations/2026-11-12_levels_1_5.sql`: límites, política de inserción y vista `leaderboard` a 1..5.
+- [x] Verificado local: con `totalLevels: 3` todo sigue en `/3`; con una copia de prueba en 5, títulos/KPIs/historial/ranking/gráficas muestran `/5` y el aviso de desajuste aparece una sola vez.
+- [ ] Acción manual: ejecutar `db/migrations/2026-11-12_levels_1_5.sql` en Supabase antes de la Fase 2.

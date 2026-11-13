@@ -5,7 +5,9 @@
   const STORAGE_KEY = 'donkiko_dashboard_runs_v1';
   const MAX_RUNS = 100;
   const MAX_LOG = 8;
-  const WORLD_WIDTH = { 1: 1000, 2: 1580, 3: 2470 };
+  const DK_CONFIG = window.DK_CONFIG || {};
+  const TOTAL_LEVELS = Math.max(1, Number(DK_CONFIG.totalLevels) || 3);
+  const WORLD_WIDTH = DK_CONFIG.levelWidths || { 1: 1000, 2: 1580, 3: 2470 };
   const RESULT_LABELS = {
     won: 'Victoria',
     game_over: 'Sin vidas',
@@ -28,7 +30,7 @@
   const RANKING_TIMEOUT_MS = 9000;
   const RANKING_REFRESH_MS = 30000;
 
-  const rankingConfig = window.DK_CONFIG || {};
+  const rankingConfig = DK_CONFIG;
   const rankingUrl = String(rankingConfig.supabaseUrl || '').replace(/\/+$/, '');
   const rankingKey = String(rankingConfig.supabaseKey || '');
   const rankingLimit = Math.min(100, Math.max(1, Number(rankingConfig.leaderboardLimit) || 50));
@@ -45,6 +47,7 @@
 
   const $ = id => document.getElementById(id);
   const frame = $('gameFrame');
+  let warnedLevelMismatch = false;
   const state = {
     runs: [],
     current: null,
@@ -418,7 +421,7 @@
         <td class="rank-cell">${rank}</td>
         <td>${escapeHtml(name)}${isMe ? ' <span class="you-tag">tú</span>' : ''}</td>
         <td class="num">${fmtNum(row.best_score)}</td>
-        <td class="num">${clamp(Number(row.best_stage) || 0, 0, 3)} / 3</td>
+        <td class="num">${clamp(Number(row.best_stage) || 0, 0, TOTAL_LEVELS)} / ${TOTAL_LEVELS}</td>
         <td class="num">${row.best_time_ms != null ? fmtDuration(row.best_time_ms) : '—'}</td>
         <td class="num">${fmtNum(row.runs)}</td>
         <td>${row.last_played ? fmtDate(row.last_played) : '—'}</td>
@@ -467,13 +470,13 @@
       endedAt,
       durationMs: Number(r.durationMs) || (wasPlaying ? Math.max(0, endedAt - r.startedAt) : 0),
       result,
-      stageReached: clamp(Number(r.stageReached) || 1, 1, 3),
+      stageReached: clamp(Number(r.stageReached) || 1, 1, TOTAL_LEVELS),
       score: Number(r.score) || 0,
       livesLeft: Number(r.livesLeft) || 0,
       cause: r.cause || null,
       feedback: normalizeFeedback(r.feedback),
       levels: Array.isArray(r.levels) ? r.levels.map(lv => ({
-        stage: clamp(Number(lv.stage) || 1, 1, 3),
+        stage: clamp(Number(lv.stage) || 1, 1, TOTAL_LEVELS),
         completed: !!lv.completed,
         closed: true,
         timeMs: Number(lv.timeMs) || 0,
@@ -566,7 +569,7 @@
 
   function startRun(level) {
     if (state.current) endRun('abandoned', { cause: 'restart' });
-    const stage = clamp(Number(level) || 1, 1, 3);
+    const stage = clamp(Number(level) || 1, 1, TOTAL_LEVELS);
     const run = {
       id: uid(),
       startedAt: now(),
@@ -629,9 +632,9 @@
     }
 
     const levels = (Array.isArray(run.levels) ? run.levels : [])
-      .slice(0, 3)
+      .slice(0, TOTAL_LEVELS)
       .map(lv => ({
-        stage: clamp(Number(lv.stage) || 1, 1, 3),
+        stage: clamp(Number(lv.stage) || 1, 1, TOTAL_LEVELS),
         completed: !!lv.completed,
         timeMs: Math.max(0, Math.round(Number(lv.timeMs) || 0)),
         hurts: Math.max(0, Math.round(Number(lv.hurts) || 0)),
@@ -646,8 +649,8 @@
       player_name: playerName,
       score: clamp(Math.round(Number(run.score) || 0), 0, 100000000),
       result: run.result,
-      start_stage: clamp(Number(run.startStage) || 1, 1, 3),
-      stage_reached: clamp(Number(run.stageReached) || 1, 1, 3),
+      start_stage: clamp(Number(run.startStage) || 1, 1, TOTAL_LEVELS),
+      stage_reached: clamp(Number(run.stageReached) || 1, 1, TOTAL_LEVELS),
       duration_ms: clamp(Math.round(Number(run.durationMs) || 0), 0, 86400000),
       active_time_ms: clamp(Math.round(activeTime), 0, 86400000),
       levels
@@ -685,6 +688,10 @@
 
   /* ---------- Telemetría del juego ---------- */
   function handleSnapshot(d) {
+    if (!warnedLevelMismatch && Number(d.totalLevels) && Number(d.totalLevels) !== TOTAL_LEVELS) {
+      warnedLevelMismatch = true;
+      console.warn(`[Don Kiko] El juego reporta ${d.totalLevels} niveles, pero DK_CONFIG.totalLevels es ${TOTAL_LEVELS}. Revisa js/config.js.`);
+    }
     const prev = state.snap;
     state.snap = d;
     if (state.current) {
@@ -785,7 +792,7 @@
 
       case 'won': {
         logEvent('¡Campaña completada!', 'good');
-        const run = endRun('won', { score: d.score, stage: 3, lives: state.snap?.lives ?? 0, cause: 'goal' });
+        const run = endRun('won', { score: d.score, stage: TOTAL_LEVELS, lives: state.snap?.lives ?? 0, cause: 'goal' });
         maybeOpenSurvey(run);
         break;
       }
@@ -816,7 +823,7 @@
     state.surveyAuto = !!auto;
     state.surveyFeeling = run.feedback ? run.feedback.feeling : 0;
     state.surveyDifficulty = run.feedback ? run.feedback.difficulty : null;
-    $('surveySub').textContent = `${RESULT_LABELS[run.result] || run.result} · Nivel ${run.stageReached || 1}/3 · ${fmtDate(run.startedAt)}`;
+    $('surveySub').textContent = `${RESULT_LABELS[run.result] || run.result} · Nivel ${run.stageReached || 1}/${TOTAL_LEVELS} · ${fmtDate(run.startedAt)}`;
     $('surveyComment').value = run.feedback ? run.feedback.comment : '';
     $('commentCount').textContent = String($('surveyComment').value.length);
     $('surveyNoAuto').checked = !surveyPrefOn();
@@ -922,7 +929,7 @@
   function renderLive() {
     const s = state.snap;
     if (!s) return;
-    $('liveLevel').textContent = `${s.stage} / 3`;
+    $('liveLevel').textContent = `${s.stage} / ${TOTAL_LEVELS}`;
     $('liveScore').textContent = pad6(s.score);
     $('liveLives').textContent = s.lives > 0 ? '♥ '.repeat(s.lives).trim() : '—';
     $('liveTime').textContent = fmtDuration((s.elapsed || 0) * 1000);
@@ -933,6 +940,13 @@
     $('liveFriend').textContent = s.friendX == null ? '—' : `${fmtNum(Math.max(0, s.x - s.friendX))} px`;
     const total = WORLD_WIDTH[s.stage] || 1000;
     $('liveProgress').style.width = `${clamp(s.x / total * 100, 0, 100).toFixed(1)}%`;
+  }
+
+  function updateTotalLevelsLabels() {
+    const label = $('totalLevelsLabel');
+    if (label) label.textContent = String(TOTAL_LEVELS);
+    const live = $('liveLevel');
+    if (live && !state.snap) live.textContent = `1 / ${TOTAL_LEVELS}`;
   }
 
   function logEvent(text, kind = 'info') {
@@ -970,7 +984,7 @@
     $('kpiBest').textContent = fmtNum(best);
     $('kpiWinRate').textContent = total ? `${Math.round(wins / total * 100)}%` : '—';
     $('kpiWins').textContent = `${wins} de ${total}`;
-    $('kpiBestStage').textContent = bestStage ? `${bestStage} / 3` : '—';
+    $('kpiBestStage').textContent = bestStage ? `${bestStage} / ${TOTAL_LEVELS}` : '—';
     $('kpiAvgTime').textContent = total ? fmtDuration(avg) : '—';
     $('kpiTotalPoints').textContent = fmtNum(points);
   }
@@ -1045,7 +1059,7 @@
         : `<button class="icon-btn survey-btn${r.feedback ? ' has-feedback' : ''}" data-survey="${r.id}" title="${r.feedback ? 'Editar encuesta' : 'Responder encuesta'}" aria-label="${r.feedback ? 'Editar encuesta' : 'Responder encuesta'}">★</button>`;
       return `<tr>
         <td>${fmtDate(r.startedAt)}</td>
-        <td>${r.stageReached || 1} / 3</td>
+        <td>${r.stageReached || 1} / ${TOTAL_LEVELS}</td>
         <td class="num">${fmtNum(r.score)}</td>
         <td class="num">${fbStars}</td>
         <td class="num">${playing ? '—' : fmtNum(r.livesLeft)}</td>
@@ -1385,6 +1399,7 @@
   if ($('refreshRankingBtn')) $('refreshRankingBtn').addEventListener('click', () => loadRanking());
 
   /* ---------- Arranque ---------- */
+  updateTotalLevelsLabels();
   loadRuns();
   updateSurveyPrefBtn();
   renderLog();

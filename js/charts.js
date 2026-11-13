@@ -11,6 +11,8 @@
   const GRID = 'rgba(151,183,205,.16)';
   const FONT = 'ui-monospace, Consolas, "Courier New", monospace';
   const UI = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  const TOTAL_LEVELS = Math.max(1, Number((window.DK_CONFIG || {}).totalLevels) || 3);
+  const LEVEL_STAGES = Array.from({ length: TOTAL_LEVELS }, (_, i) => i + 1);
 
   function setup(canvas) {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -206,7 +208,7 @@
 
   /* Vidas perdidas por nivel. */
   function hurts(canvas, runs) {
-    const sums = [1, 2, 3].map(stage => {
+    const sums = LEVEL_STAGES.map(stage => {
       let total = 0;
       for (const run of runs || []) {
         for (const lv of run.levels || []) {
@@ -232,7 +234,7 @@
       }
       return (Number(run.stageReached) || 1) >= stage;
     };
-    const reached = [1, 2, 3].map(stage => ({
+    const reached = LEVEL_STAGES.map(stage => ({
       label: `Nivel ${stage}`,
       value: Math.round(list.filter(r => reachedStage(r, stage)).length / total * 100),
       suffix: '%'
