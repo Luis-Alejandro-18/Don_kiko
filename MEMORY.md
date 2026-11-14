@@ -256,8 +256,24 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `js/config.js`: `totalLevels` y `levelWidths` como fuente única del panel.
 - [x] `js/dashboard.js`: `TOTAL_LEVELS` sustituye los `3` fijos (ranking, KPIs, historial, encuesta, envío y vista en vivo); `.slice(0,3)` pasa a `.slice(0,TOTAL_LEVELS)`.
 - [x] `js/charts.js`: embudo y vidas por nivel se generan con `LEVEL_STAGES`.
-- [x] `index.html`: el título muestra el total desde `#totalLevelsLabel`.
+- [x] `index.html`: el título muestra el total desde `#levelsSubtitle` (un solo span, sin anidar; el span anidado rompía la línea por `h1 span{display:block}`).
 - [x] El juego emite `totalLevels` en `ready` y `snapshot`; el panel avisa si no coincide con la config.
 - [x] `db/schema.sql` y `db/migrations/2026-11-12_levels_1_5.sql`: límites, política de inserción y vista `leaderboard` a 1..5.
 - [x] Verificado local: con `totalLevels: 3` todo sigue en `/3`; con una copia de prueba en 5, títulos/KPIs/historial/ranking/gráficas muestran `/5` y el aviso de desajuste aparece una sola vez.
-- [ ] Acción manual: ejecutar `db/migrations/2026-11-12_levels_1_5.sql` en Supabase antes de la Fase 2.
+- [x] Migración `db/migrations/2026-11-12_levels_1_5.sql` aplicada en Supabase; verificado con una inserción real `start_stage=4` (HTTP 201).
+
+### Fase 9 (Nivel 4: De vuelta a casa) — 2026-11-13
+
+- [x] `game/don_kiko.html`: `LEVEL_NAMES[4] = 'De vuelta a casa'` y `LEVELS[4]` con calle continua de 2500 px, 3 barriles, 5 tokens y meta en la puerta de casa.
+- [x] Tráfico: aviso de 0,95 s con faros y "¡CARRO!", carros de 185–255 px/s que se pueden saltar; impacto = 1 vida y rebote.
+- [x] Perros: duermen, despiertan a 96 px, se lanzan ~94 px y descansan 1,7 s; telegrafiados con "¡GUAU!" y "!".
+- [x] Charcos: resbalón de 0,5 s sin quitar vida, con aviso "¡RESBALÓN!".
+- [x] Borrachera con deriva real: oscilación de ±10 % a 1,5 Hz y traspiés cada 6,5–10,5 s; se apaga en el aire, quieto o cerca de peligro (carro/perro/borde). La cámara se mece ~4 px y el HUD queda fijo.
+- [x] Intermisión del nivel 3 y final propio del nivel 4 (`finale: '¡A CASA!'`); el overlay `won` usa `finale` si existe.
+- [x] `js/config.js`: `totalLevels: 4`, `levelWidths[4] = 2500`.
+- [x] `index.html`: botón "Nivel 4", título del iframe sin número fijo y subtítulo del panel con `#levelsSubtitle`.
+- [x] `js/dashboard.js`: victoria se muestra como "Completó la campaña" (antes "Llegó a la cantina").
+- [x] Verificado en Chrome headless: nivel 4 inicia en 4/4, aparecen carros/avisos/perros/resbalones, se llega a la meta y overlay "¡A CASA!"; nivel 3 → intermisión → Enter → nivel 4 conserva puntos y vidas; niveles 1–3 sin errores; panel en `/4`, botón 4 en vivo, KPIs/historial/ranking/gráficas sin aviso de desajuste.
+- [x] Política de Supabase verificada con inserción anónima real `start_stage=4`, `stage_reached=4`.
+- [ ] Limpieza: `delete from public.runs where client_run_id = 'test-nivel4-20261113';`.
+- [ ] Siguiente: Nivel 5 (cierre de la historia y continuidad de Pau).

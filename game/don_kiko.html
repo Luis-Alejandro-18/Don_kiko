@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081b2b">
-<title>Don Kiko — 3 niveles, versión 2.1</title>
+<title>Don Kiko - 4 niveles, versión 2.2</title>
 <style>
 :root{color-scheme:dark;--bg:#08182b;--white:#eef6fb;--gold:#ffe19a;--border:#537999;--panel:#10263e}
 *{box-sizing:border-box}
@@ -57,15 +57,15 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
 <body>
 <main>
 <header class="top">
-  <div><h1>DON KIKO</h1><p class="subtitle">LA AVENTURA COMPLETA · 3 NIVELES · VERSIÓN 2.1</p></div>
+  <div><h1>DON KIKO</h1><p class="subtitle">LA AVENTURA COMPLETA · 4 NIVELES · VERSIÓN 2.2</p></div>
   <div class="hud" aria-live="polite">
-    <div class="stat level">NIVEL<strong id="levelNumber">1 / 3</strong></div>
+    <div class="stat level">NIVEL<strong id="levelNumber">1 / 4</strong></div>
     <div class="stat">PUNTOS<strong id="score">000000</strong></div>
     <div class="stat">VIDAS<strong id="lives">♥ ♥ ♥</strong></div>
     <div class="stat">RÉCORD<strong id="best">000000</strong></div>
   </div>
 </header>
-<div class="frame"><canvas id="game" width="1000" height="700" aria-label="Videojuego Don Kiko, tres niveles jugables"></canvas></div>
+<div class="frame"><canvas id="game" width="1000" height="700" aria-label="Videojuego Don Kiko, cuatro niveles jugables"></canvas></div>
 <div class="toolbar">
   <div class="legend">
     <kbd>←</kbd><kbd>→</kbd> o <kbd>A</kbd><kbd>D</kbd> mover · <kbd>↑</kbd><kbd>↓</kbd> escaleras · <kbd>ESPACIO</kbd> saltar · <kbd>J</kbd> golpear · <kbd>P</kbd> pausa · <kbd>R</kbd> reiniciar nivel
@@ -88,8 +88,9 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
   <button data-level="1">Nivel 1</button>
   <button data-level="2">Nivel 2</button>
   <button data-level="3">Nivel 3</button>
+  <button data-level="4">Nivel 4</button>
 </section>
-<p class="info"><strong>Historia:</strong> Pau tiene encerrado a JuanMa, el mejor amigo de Don Kiko. Sube a rescatarlo en el nivel 1, escapen juntos por las azoteas en el nivel 2 y lleguen a la cantina en el nivel 3. <strong>Consejo:</strong> golpea los barriles de frente, salta los huecos y esquiva perros y automóviles. En el nivel 2, Pau avisa antes de dejar caer macetas; en el 3, los peligros están colocados en posiciones fijas y visibles. Las vidas y los puntos se conservan al avanzar de nivel. En el nivel 3, Pau inicia una persecución autónoma tras el automóvil; si te alcanza, pierdes todas tus vidas y vuelves al nivel 1. Archivo HTML autónomo: funciona sin Internet.</p>
+<p class="info"><strong>Historia:</strong> Pau tiene encerrado a JuanMa, el mejor amigo de Don Kiko. Sube a rescatarlo en el nivel 1, escapen juntos por las azoteas en el nivel 2, lleguen a la cantina en el nivel 3 y vuelvan a casa en el nivel 4. <strong>Consejo:</strong> golpea los barriles de frente, salta los huecos y esquiva perros y automóviles. En el nivel 2, Pau avisa antes de dejar caer macetas; en el 3, los peligros están colocados en posiciones fijas y visibles. En el nivel 4, los carros avisan con faros y bocinazo antes de entrar, los perros despiertan si te acercas y los charcos te hacen resbalar; la borrachera mece la cámara y provoca traspiés, pero se desactiva cerca de los peligros para no ser injusta. Las vidas y los puntos se conservan al avanzar de nivel. En el nivel 3, Pau inicia una persecución autónoma tras el automóvil; si te alcanza, pierdes todas tus vidas y vuelves al nivel 1. Archivo HTML autónomo: funciona sin Internet.</p>
 </main>
 <script>
 (() => {
@@ -102,7 +103,7 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const rand = (a, b) => a + Math.random() * (b - a);
   const hitBox = (a,b,ax,ay,bx,by) => Math.abs(ax-bx)<a && Math.abs(ay-by)<b;
-  const LEVEL_NAMES = ['','Rescate en el edificio','Escape por las azoteas','Rumbo a las chelas'];
+  const LEVEL_NAMES = ['','Rescate en el edificio','Escape por las azoteas','Rumbo a las chelas','De vuelta a casa'];
   // Agregar un nivel = agregar su nombre aquí y su configuración en LEVELS.
   const TOTAL_LEVELS = LEVEL_NAMES.length - 1;
   const NUM_WORDS = {1:'Un',2:'Dos',3:'Tres',4:'Cuatro',5:'Cinco',6:'Seis',7:'Siete',8:'Ocho'};
@@ -160,6 +161,14 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   const roofBridges = [{a:578,b:649,y:526}];
   const roofSurfaces = [...roofs,...roofBridges];
   const streetCheckpoints = [105,798,1445,2080];
+  // ---------- Nivel 4: De vuelta a casa ----------
+  // Calle continua: el peligro es el tráfico, no los huecos.
+  const HOME_WIDTH = 2500;
+  const HOME_CHECKPOINTS = [105,620,1080,1680];
+  const homeSurfaces = [{a:38,b:HOME_WIDTH,y:STREET_Y}];
+  const HOME_DOGS = [880,1440,1980];
+  const HOME_PUDDLES = [{x:380,w:110},{x:960,w:130},{x:1560,w:120},{x:2100,w:110}];
+  const HOME_QUIPS = ['¡Yo vivo por aquí!','¿Esta es mi casa?','¡Shhh, no despiertes al perro!','¡Esa no era la puerta!','¡Ya casi llegamos!','¡Una más y llegamos!'];
   const groundAt = x => !holes.some(h=>x > h.a && x < h.b);
   const roofAt = x => roofs.find(r=>x>=r.a && x<=r.b);
   let stage = 1, phase = 'menu', lives=3, score=0, best=0, time=0;
@@ -168,6 +177,9 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   let checkpoint=0, levelScore=0, elapsed=0, companionTip=0;
   let pauChase={active:false,x:0};
   let lostToPau=false, pauRestartCountdown=0, surveyHold=false;
+  // Estado del nivel 4 (tráfico, perros y tambaleo).
+  let trafficCars=[], carWarn=[], carTimer=0, homeDogState=[], puddleLast=-1, slipT=0, slipDir=0;
+  let driftPhase=0, stumbleT=0, stumbleDir=1, nextStumble=0, hiccupT=0, quipT=0, quip='', quipShow=0;
   try {best=Number(localStorage.getItem('donkiko_best')||0);} catch(e){}
 
   function sound(hz=340,d=.08,kind='square',gain=.026){
@@ -202,6 +214,8 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   function initializeStage(n){
     stage=n;objects=[];particles=[];notices=[];warnings=[];tokens=[];spawnTimer=-1.2;spawnCount=0;elapsed=0;camera=0;shake=0;levelScore=score;companionTip=0;
     pauChase={active:false,x:0};lostToPau=false;pauRestartCountdown=0;surveyHold=false;
+    trafficCars=[];carWarn=[];carTimer=2.6;homeDogState=HOME_DOGS.map(x=>({x,baseX:x,state:'sleep',t:0,armed:true}));
+    puddleLast=-1;slipT=0;slipDir=0;driftPhase=0;stumbleT=0;nextStumble=rand(6.5,10.5);hiccupT=rand(12,18);quipT=rand(6,9);quip='';quipShow=0;
     const cfg=levelOf(stage), setup=cfg.start();
     player=setup.player;friend=setup.friend;checkpoint=setup.checkpoint;
     objects=setup.objects;tokens=setup.tokens;
@@ -354,9 +368,11 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     if(p.floor===5&&p.x>=799&&!p.air&&!p.climb)completeStage();
   }
   function roofGrounds(){return roofs;}
-  function updatePlatformPlayer(dt,segments,gravity,speed){
+  function updatePlatformPlayer(dt,segments,gravity,speed,extraDx=0){
     const p=player,dir=Number(keys.right)-Number(keys.left),oldX=p.x;
     if(dir){p.face=dir;p.x=clamp(p.x+dir*speed*dt,38,levelOf(stage).width-32);}
+    // El tambaleo del nivel 4 se suma al movimiento voluntario.
+    if(extraDx)p.x=clamp(p.x+extraDx,38,levelOf(stage).width-32);
     const old=p.bottom;
     if(p.grounded){
       const support=segments.find(s=>p.x>=s.a+5&&p.x<=s.b-5&&Math.abs(p.bottom-s.y)<17);
@@ -492,6 +508,95 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     collectTokens();
     if(player.x>2345&&player.x-friend.x<125&&player.grounded)completeStage();
   }
+  // ---------- Nivel 4: tráfico, perros y tambaleo ----------
+  const CAR_COLORS=['#aebfc3','#c98d7b','#8fa9bd','#d0b27a','#9bb59a'];
+  function spawnCar(side){
+    const dir=side==='right'?-1:1;
+    const x=side==='right'?camera+W+70:camera-70;
+    trafficCars.push({x,vx:dir*rand(185,255),dir,color:CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)]});
+  }
+  function updateTraffic(dt){
+    carTimer-=dt;
+    if(carTimer<=0){
+      carTimer=rand(2.9,4.6);
+      if(trafficCars.length<3&&carWarn.length===0){
+        carWarn.push({side:Math.random()<0.28?'left':'right',t:.95});
+        sound(190,.13,'sawtooth',.018);
+      }
+    }
+    for(const w of carWarn){w.t-=dt;if(w.t<=0)spawnCar(w.side);}
+    carWarn=carWarn.filter(w=>w.t>0);
+    for(const c of trafficCars){
+      c.x+=c.vx*dt;
+      if(phase!=='playing')break;
+      // Se puede saltar: el choque exige estar a ras de calle.
+      if(Math.abs(player.x-c.x)<54&&player.bottom>STREET_Y-50)hurt();
+    }
+    trafficCars=trafficCars.filter(c=>c.x>-180&&c.x<HOME_WIDTH+180);
+  }
+  function updateHomeDogs(dt){
+    for(const d of homeDogState){
+      const dist=Math.abs(player.x-d.x);
+      if(d.state==='sleep'){
+        if(dist>132)d.armed=true;
+        if(d.armed&&dist<96){d.state='wake';d.t=.45;d.dir=player.x>=d.x?1:-1;flash('¡GUAU!',.9);sound(520,.1,'square',.02);}
+      }else if(d.state==='wake'){
+        d.t-=dt;if(d.t<=0){d.state='lunge';d.t=.4;}
+      }else if(d.state==='lunge'){
+        d.t-=dt;d.x+=d.dir*235*dt;
+        if(Math.abs(player.x-d.x)<46&&player.bottom>STREET_Y-58&&phase==='playing')hurt();
+        if(d.t<=0){d.state='rest';d.t=1.7;}
+      }else{
+        d.t-=dt;
+        const back=d.baseX-d.x;
+        if(Math.abs(back)>2)d.x+=Math.sign(back)*Math.min(Math.abs(back),150*dt);
+        if(d.t<=0){d.state='sleep';d.x=d.baseX;d.armed=false;}
+      }
+    }
+  }
+  function nearDanger(){
+    if(carWarn.length)return true;
+    for(const c of trafficCars)if(Math.abs(c.x-player.x)<190)return true;
+    for(const d of homeDogState)if(Math.abs(d.x-player.x)<170)return true;
+    return player.x<90||player.x>HOME_WIDTH-100;
+  }
+  function updateDrunk(dt){
+    const idx=HOME_PUDDLES.findIndex(p=>player.x>p.x&&player.x<p.x+p.w);
+    if(idx>=0&&puddleLast!==idx&&player.grounded){
+      puddleLast=idx;slipT=.5;slipDir=player.face||1;flash('¡RESBALÓN!',1);sound(240,.1,'sine',.02);
+    }else if(idx<0)puddleLast=-1;
+    if(slipT>0)slipT=Math.max(0,slipT-dt);
+    const slipDx=slipT>0?slipDir*170*dt:0;
+    // Cerca de un peligro se desactiva el tambaleo para no castigar de más.
+    if(!player.grounded||!(keys.left||keys.right)||nearDanger())return slipDx;
+    driftPhase+=dt;
+    let extra=slipDx+Math.sin(driftPhase*TAU*1.5)*260*.10*dt;
+    nextStumble-=dt;
+    if(nextStumble<=0){
+      stumbleT=.22;stumbleDir=Math.random()<.65?(player.face||1):-(player.face||1);
+      nextStumble=rand(6.5,10.5);
+    }
+    if(stumbleT>0){stumbleT-=dt;extra+=stumbleDir*150*dt;}
+    return extra;
+  }
+  function updateStageFour(dt){
+    updateTraffic(dt);
+    if(phase!=='playing')return;
+    updateHomeDogs(dt);
+    if(phase!=='playing')return;
+    const extra=updateDrunk(dt);
+    updatePlatformPlayer(dt,homeSurfaces,1090,260,extra);
+    if(phase!=='playing')return;
+    for(const c of HOME_CHECKPOINTS)if(player.x>=c)checkpoint=c;
+    updateCompanion(dt);
+    collectTokens();
+    hiccupT-=dt;
+    if(hiccupT<=0){hiccupT=rand(13,19);flash('¡HIP!',.8);sound(330,.08,'square',.015);}
+    quipT-=dt;
+    if(quipT<=0){quipT=rand(7,11);quip=HOME_QUIPS[Math.floor(Math.random()*HOME_QUIPS.length)];quipShow=2.4;}
+    if(quipShow>0)quipShow-=dt;
+    if(player.x>HOME_WIDTH-130&&player.grounded&&Math.abs(player.x-friend.x)<125)completeStage();
+  }
   function update(dt){
     for(const n of notices)n.t-=dt;notices=notices.filter(n=>n.t>0);
     for(const a of particles){a.vy+=390*dt;a.x+=a.vx*dt;a.y+=a.vy*dt;a.life-=dt;}
@@ -529,7 +634,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   function pot(x,y){rect(x-12,y-2,24,15,'#d05b52');rect(x-15,y-6,30,6,'#ee8772');rect(x-2,y-22,4,18,'#56b774');line(x-2,y-16,x-11,y-25,'#56b774',4);line(x+2,y-12,x+11,y-23,'#56b774',4);}
   function bottle(x,y){rect(x-5,y-14,10,25,'#60c3ca');rect(x-2,y-20,4,8,'#a6ecdb');rect(x-7,y+10,14,3,'#264b61');}
   function dog(x,ground){rect(x-21,ground-26,42,22,'#a09a84');rect(x+12,ground-36,23,23,'#d6b686');rect(x+20,ground-40,8,8,'#725c4e');rect(x-13,ground-4,8,10,'#b9a189');rect(x+7,ground-4,8,10,'#b9a189');rect(x+26,ground-22,4,4,'#16293a');line(x-20,ground-22,x-30,ground-39,'#d6b686',5);}
-  function car(x,ground){rect(x-32,ground-38,74,30,'#aebfc3');rect(x-17,ground-55,38,20,'#57778b');rect(x-11,ground-51,27,14,'#93b5bd');rect(x-35,ground-10,83,8,'#426075');circle(x-15,ground-3,9,'#172537');circle(x+29,ground-3,9,'#172537');}
+  function car(x,ground,body='#aebfc3'){rect(x-32,ground-38,74,30,body);rect(x-17,ground-55,38,20,'#57778b');rect(x-11,ground-51,27,14,'#93b5bd');rect(x-35,ground-10,83,8,'#426075');circle(x-15,ground-3,9,'#172537');circle(x+29,ground-3,9,'#172537');}
   function crate(x,ground){rect(x-23,ground-44,46,44,'#ac7849');ctx.strokeStyle='#563e36';ctx.lineWidth=3;ctx.strokeRect(x-23,ground-44,46,44);line(x-21,ground-42,x+21,ground-2,'#ecd096',3);line(x+21,ground-42,x-21,ground-2,'#ecd096',3);}
   function drawObject(o){
     if(o.type==='barrel')barrel(o.x,o.y,o.angle||0);
@@ -709,6 +814,75 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     drawProgressBar(player.x/cfg.progress.end,cfg.progress.label);
     txt(typeof cfg.hint==='function'?cfg.hint():cfg.hint,440,63,13,'#e6eac1');
   }
+  function drawStageFour(){
+    streetBackground();
+    ctx.save();
+    // El mundo se mece; el HUD se queda quieto.
+    const swayX=Math.sin(time*1.4)*4.2,swayY=Math.sin(time*1.9+.6)*2.2;
+    ctx.translate(-camera+swayX,swayY);
+    // Fachadas del barrio.
+    buildingStreet(15,STREET_Y,300,250,'#9d6f68');
+    buildingStreet(345,STREET_Y,290,215,'#b08a6d');
+    buildingStreet(665,STREET_Y,330,270,'#8b8f96');
+    buildingStreet(1025,STREET_Y,300,235,'#a97a70');
+    buildingStreet(1355,STREET_Y,350,265,'#947c65');
+    buildingStreet(1735,STREET_Y,320,225,'#a2876f');
+    buildingStreet(2160,STREET_Y,330,245,'#b58f72');
+    // Letreros.
+    box(700,STREET_Y-208,200,36,'#1d3446','#e8d6a8');
+    txt('ABIERTO 24 H',800,STREET_Y-183,15,'#ffe8b0','center');
+    box(1055,STREET_Y-196,210,34,'#3f2f2c','#e8c98e');
+    txt('CERRADO · SHH',1160,STREET_Y-172,14,'#ffdfa5','center');
+    // Postes de luz.
+    for(const lx of [300,640,980,1320,1660,2000]){
+      rect(lx-3,STREET_Y-160,6,160,'#3a4c5a');
+      ctx.globalAlpha=.16;circle(lx,STREET_Y-166,34,'#ffe7a6');ctx.globalAlpha=1;
+      circle(lx,STREET_Y-166,10,'#ffe7a6');
+    }
+    // Charcos.
+    for(const p of HOME_PUDDLES){
+      ctx.fillStyle='#1a3550';ctx.beginPath();ctx.ellipse(p.x+p.w/2,STREET_Y-2,p.w/2,6,0,0,TAU);ctx.fill();
+      ctx.fillStyle='#5f8aa6';ctx.beginPath();ctx.ellipse(p.x+p.w/2,STREET_Y-4,p.w/3,2.2,0,0,TAU);ctx.fill();
+    }
+    // La casa de Don Kiko: puerta, porche y luz encendida.
+    rect(2338,STREET_Y-98,58,98,'#4f352b');
+    rect(2344,STREET_Y-92,46,86,'#6d4a38');
+    circle(2372,STREET_Y-62,3,'#ffe6a8');
+    ctx.globalAlpha=.28;circle(2372,STREET_Y-116,30,'#ffe9a8');ctx.globalAlpha=1;
+    box(2290,STREET_Y-186,160,32,'#163956','#f3d9a4');
+    txt('CASA',2370,STREET_Y-163,18,'#ffe9b6','center');
+    // Aviso de carro que viene.
+    for(const w of carWarn){
+      const wx=w.side==='right'?camera+W-70:camera+70;
+      if(Math.floor(elapsed*8)%2===0){
+        circle(wx,STREET_Y-118,21,'#a34b48');
+        txt('!',wx,STREET_Y-108,28,'#fff7d7','center');
+      }
+      txt('¡CARRO!',wx,STREET_Y-154,15,'#ffd27f','center');
+    }
+    // Carros.
+    for(const c of trafficCars){
+      const glow=c.dir<0?c.x-44:c.x+44;
+      ctx.globalAlpha=.2;circle(glow,STREET_Y-30,15,'#ffe9a8');ctx.globalAlpha=1;
+      car(c.x,STREET_Y,c.color);
+    }
+    // Perros dormidos, alertas o lanzados.
+    for(const d of homeDogState){
+      dog(d.x,STREET_Y);
+      if(d.state==='sleep')txt('z',d.x+22,STREET_Y-54+Math.sin(elapsed*2)*2,14,'#9fb7c9','center');
+      if(d.state==='wake')speech('¡GUAU!',d.x-36,STREET_Y-98,80);
+      if(d.state==='lunge')txt('!',d.x+26,STREET_Y-60,20,'#ff9a9a','center');
+    }
+    for(const o of objects)drawObject(o);
+    drawExtraItems();
+    drawCharacters();
+    if(quipShow>0)speech(quip,player.x-72,player.bottom-120,172);
+    for(const a of particles)rect(a.x,a.y,5,5,a.color);
+    ctx.restore();
+    const cfg=levelOf(stage);
+    drawProgressBar(player.x/cfg.progress.end,cfg.progress.label);
+    txt(typeof cfg.hint==='function'?cfg.hint():cfg.hint,440,63,13,'#e6eac1');
+  }
   // ---------- Configuración de niveles ----------
   // Cada nivel declara arranque, física, acompañante, dibujo y meta.
   // Agregar un nivel nuevo = agregar su nombre en LEVEL_NAMES y una entrada aquí.
@@ -816,7 +990,56 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
       update: updateStageThree,
       draw: drawStageThree,
       progress: {end:2360,label:'CANTINA'},
-      hint: () => pauChase.active?'¡ESCAPA DE PAU!  ·  SU CONTACTO ES GAME OVER':'GOLPEA LAS CAJAS  ·  ESQUIVA LOS PELIGROS'
+      hint: () => pauChase.active?'¡ESCAPA DE PAU!  ·  SU CONTACTO ES GAME OVER':'GOLPEA LAS CAJAS  ·  ESQUIVA LOS PELIGROS',
+      intermission: {
+        title: '¡LLEGARON A LA CANTINA!',
+        lines: score => [
+          'Las chelas están servidas... y de más.',
+          'Ahora hay que volver a casa esquivando el barrio.',
+          'Siguiente: NIVEL 4 · DE VUELTA A CASA',
+          `Puntuación acumulada: ${score}`
+        ]
+      }
+    },
+    4: {
+      width: HOME_WIDTH,
+      camera: true,
+      jump: 'platform',
+      airKnockback: false,
+      showCompanion: true,
+      showFloor: false,
+      mission: 'MISIÓN: LLEGAR A CASA SIN PERDERSE',
+      flash: '¡A casa, antes de que salga el sol!',
+      start(){
+        return {
+          player: playerAt(105,STREET_Y),
+          friend: {x:51,bottom:STREET_Y},
+          checkpoint: 105,
+          objects: [
+            {x:560,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true},
+            {x:1240,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true},
+            {x:1830,y:STREET_Y-16,r:16,type:'barrel',breakable:true,static:true}
+          ],
+          tokens: [{x:340,y:STREET_Y-54},{x:700,y:STREET_Y-54},{x:1120,y:STREET_Y-56},{x:1620,y:STREET_Y-54},{x:2260,y:STREET_Y-54}]
+        };
+      },
+      respawn(player,friend,checkpoint){
+        player.x=checkpoint;player.bottom=STREET_Y;
+        friend.x=player.x-55;friend.bottom=STREET_Y;
+      },
+      companion: {mode:'street',pace:300},
+      update: updateStageFour,
+      draw: drawStageFour,
+      progress: {end:2380,label:'CASA'},
+      hint: () => (carWarn.length||trafficCars.some(c=>Math.abs(c.x-player.x)<300))?'¡SALTA LOS CARROS!  ·  FAROS = AVISO':'CUIDADO CON LOS PERROS Y LOS CHARCOS',
+      finale: {
+        title: '¡A CASA!',
+        lines: score => [
+          'Don Kiko y JuanMa llegaron a la puerta.',
+          'Mañana será otro día... si es que llegan despiertos.',
+          `Puntuación final: ${score}`
+        ]
+      }
     }
   };
   const levelOf = n => LEVELS[n] || LEVELS[1];
@@ -857,7 +1080,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   }
   function drawOverlays(){
     if(phase==='menu')overlay('DON KIKO: LA AVENTURA',[
-      `${numberWord(TOTAL_LEVELS)} niveles para llegar con JuanMa a la cantina.`,
+      `${numberWord(TOTAL_LEVELS)} niveles para volver a casa con JuanMa.`,
       ...Object.keys(LEVELS).map(n=>`${n} · ${LEVEL_NAMES[n]}`)
     ],'#ffe19b','ENTER O ▶ JUGAR');
     if(phase==='paused')overlay('PAUSA',[
@@ -882,12 +1105,19 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
       `Puntuación: ${score}`,
       lostToPau?(surveyHold&&pauRestartCountdown===0?'Responde la encuesta del panel para continuar.':`Reinicio automático desde NIVEL 1 en ${Math.ceil(pauRestartCountdown)} s`):'¡Toda la aventura vuelve a comenzar desde el NIVEL 1!'
     ],'#ffb5b6',lostToPau?'ENTER / REINICIAR AHORA':'ENTER / REINICIAR DESDE NIVEL 1');
-    if(phase==='won')overlay('¡MISIÓN CUMPLIDA!',[
-      '¡Don Kiko y JuanMa llegaron a la cantina!',
-      'Después de tantos barriles, ¡las chelas se ganaron!',
-      `FIN · ${numberWord(TOTAL_LEVELS).toUpperCase()} NIVELES COMPLETADOS`,
-      `Puntuación final: ${score}`
-    ],'#ffe2a5','ENTER / JUGAR OTRA VEZ');
+    if(phase==='won'){
+      const cfg=levelOf(stage);
+      if(cfg.finale){
+        overlay(cfg.finale.title,typeof cfg.finale.lines==='function'?cfg.finale.lines(score):cfg.finale.lines,'#ffe2a5','ENTER / JUGAR OTRA VEZ');
+      }else{
+        overlay('¡MISIÓN CUMPLIDA!',[
+          '¡Don Kiko y JuanMa llegaron a la cantina!',
+          'Después de tantos barriles, ¡las chelas se ganaron!',
+          `FIN · ${numberWord(TOTAL_LEVELS).toUpperCase()} NIVELES COMPLETADOS`,
+          `Puntuación final: ${score}`
+        ],'#ffe2a5','ENTER / JUGAR OTRA VEZ');
+      }
+    }
   }
   function render(){
     ctx.save();if(shake>0)ctx.translate(rand(-4,4),rand(-3,3));
@@ -922,7 +1152,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   $('soundBtn').addEventListener('click',()=>{muted=!muted;$('soundBtn').textContent=muted?'♫ Sonido: no':'♫ Sonido: sí';if(!muted)sound(490,.07);});
   document.querySelectorAll('[data-level]').forEach(b=>b.addEventListener('click',()=>begin(Number(b.dataset.level))));
   // Read-only state is exposed to help inspect a running student prototype.
-  window.donKikoStatus=()=>({phase,stage,score,lives,x:Math.round(player.x),y:Math.round(player.bottom),friendX:Math.round(friend.x),objects:objects.length,pauActive:pauChase.active,pauX:pauChase.active?Math.round(pauChase.x):null,lostToPau,cratePresent:objects.some(o=>o.type==='crate')});
+  window.donKikoStatus=()=>({phase,stage,score,lives,x:Math.round(player.x),y:Math.round(player.bottom),friendX:Math.round(friend.x),objects:objects.length,pauActive:pauChase.active,pauX:pauChase.active?Math.round(pauChase.x):null,lostToPau,cratePresent:objects.some(o=>o.type==='crate'),cars:trafficCars.length,warnCars:carWarn.length,dogAlert:homeDogState.some(d=>d.state==='wake'||d.state==='lunge'),slip:slipT>0});
   // Comandos enviados por el dashboard.
   window.addEventListener('message',e=>{
     const d=e.data;

@@ -1,6 +1,6 @@
 # Don Kiko — Dashboard
 
-Panel web para jugar *Don Kiko: la aventura completa (3 niveles, v2.1)*, ver estadísticas en vivo, historial de partidas y los resultados de una encuesta breve de opinión. Funciona sin Internet y sin instalar nada.
+Panel web para jugar *Don Kiko: la aventura completa (4 niveles)*, ver estadísticas en vivo, historial de partidas y los resultados de una encuesta breve de opinión. Funciona sin Internet y sin instalar nada.
 
 ## Cómo abrirlo
 

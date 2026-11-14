@@ -1,6 +1,6 @@
 # AGENT.md — Don Kiko Dashboard
 
-Panel web para jugar **Don Kiko** (3 niveles) y ver telemetría, KPIs, historial y ranking global.
+Panel web para jugar **Don Kiko** (4 niveles) y ver telemetría, KPIs, historial y ranking global.
 HTML/CSS/JS sin dependencias ni build. El modo local funciona sin red; el ranking usa Supabase.
 
 ## Alcance
@@ -31,7 +31,7 @@ Juego → panel (`source: 'donkiko'`):
 `ready`, `snapshot`, `run_start`, `stage_complete`, `hurt`, `token`, `punch_hit`, `pause`, `resume`, `pau_caught`, `game_over`, `won`.
 Panel → juego (`source: 'dashboard'`):
 `start {level}`, `continue`, `toggle`, `pause`, `resume`, `restart`, `mute {value}`, `status`.
-- `snapshot` cada 250 ms: phase, stage, score, lives, x, friendX, floor, pauActive, pauX, objects, elapsed, levelName, goalX, muted.
+- `snapshot` cada 250 ms: phase, stage, score, lives, x, y, friendX, floor, pauActive, pauX, objects, cratePresent, elapsed, totalTime, levelName, totalLevels.
 - No cambiar nombres ni campos sin actualizar dashboard y `MEMORY.md`.
 
 ## Datos (Supabase)
@@ -40,7 +40,7 @@ Panel → juego (`source: 'dashboard'`):
 - `runs` guarda partidas; `leaderboard` es la vista de campaña (`start_stage = 1`).
 - RLS: `anon` solo lee e inserta; nunca `service_role` en el frontend.
 - Identidad: `player_name` anónimo o `user_id` + `alias` de Supabase Auth (email/password).
-- El panel envía solo campañas terminadas (`won`, `game_over`, `pau_caught`) y lee `leaderboard`; pruebas de nivel 2/3 y abandonadas quedan locales.
+- El panel envía solo campañas terminadas (`won`, `game_over`, `pau_caught`) y lee `leaderboard`; pruebas de nivel 2 a 4 y abandonadas quedan locales.
 - `submitRun` requiere autenticación para aparecer en el ranking global; modo local sigue sin cuenta.
 - `active_time_ms` = suma de niveles; orden por puntaje y mejor tiempo de victoria como desempate.
 - `file://` se probó en Chrome; si un navegador bloquea la red, usar Netlify o `http://localhost`; el modo local no depende del ranking.
@@ -54,7 +54,7 @@ Panel → juego (`source: 'dashboard'`):
 
 ## Verificación manual (escritorio)
 - [ ] `index.html` abre por file:// y el badge sale de "Conectando…".
-- [ ] Nivel 1/2/3 inician y crean una partida en el historial.
+- [ ] Nivel 1 a 4 inician y crean una partida en el historial.
 - [ ] Pausa/Reanudar desde el panel funciona con el foco dentro del juego.
 - [ ] Al completar un nivel, "Siguiente nivel" avanza desde el panel.
 - [ ] Cerrar a mitad de nivel y verificar puntos guardados al reabrir.
