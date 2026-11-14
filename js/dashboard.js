@@ -943,8 +943,8 @@
   }
 
   function updateTotalLevelsLabels() {
-    const label = $('totalLevelsLabel');
-    if (label) label.textContent = String(TOTAL_LEVELS);
+    const label = $('levelsSubtitle');
+    if (label) label.textContent = `DASHBOARD · ${TOTAL_LEVELS} NIVELES`;
     const live = $('liveLevel');
     if (live && !state.snap) live.textContent = `1 / ${TOTAL_LEVELS}`;
   }
@@ -1037,7 +1037,7 @@
   }
 
   function causeLabel(r) {
-    if (r.result === 'won') return 'Llegó a la cantina';
+    if (r.result === 'won') return 'Completó la campaña';
     if (r.result === 'pau_caught') return 'Alcanzado por Pau';
     if (r.result === 'abandoned') return 'Reinicio o cierre';
     if (r.result === 'playing') return '—';

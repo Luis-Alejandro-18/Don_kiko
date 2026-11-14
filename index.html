@@ -11,7 +11,7 @@
 <main>
   <header class="top">
     <div>
-      <h1>DON KIKO<span>DASHBOARD · <span id="totalLevelsLabel">3</span> NIVELES</span></h1>
+      <h1>DON KIKO<span id="levelsSubtitle">DASHBOARD · 4 NIVELES</span></h1>
       <p class="subtitle">Panel de juego, telemetría en vivo, historial y opiniones de jugadores.</p>
     </div>
     <div class="header-actions">
@@ -38,12 +38,13 @@
   <section class="workspace" aria-label="Juego y telemetría">
     <div class="card game-card">
       <div class="game-frame">
-        <iframe id="gameFrame" src="game/don_kiko.html?embed=1" title="Juego Don Kiko: tres niveles"></iframe>
+        <iframe id="gameFrame" src="game/don_kiko.html?embed=1" title="Juego Don Kiko: campaña"></iframe>
       </div>
       <div class="game-controls">
         <button data-cmd="start" data-level="1">Nivel 1</button>
         <button data-cmd="start" data-level="2">Nivel 2</button>
         <button data-cmd="start" data-level="3">Nivel 3</button>
+        <button data-cmd="start" data-level="4">Nivel 4</button>
         <button data-cmd="toggle" id="pauseToggleBtn">Pausa</button>
         <button data-cmd="restart">Reiniciar</button>
         <button data-cmd="mute" id="soundToggleBtn">Sonido: sí</button>
