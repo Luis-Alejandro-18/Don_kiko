@@ -275,5 +275,6 @@ Verificado con Chrome headless + CDP, `http://127.0.0.1:8000/` y `file://`:
 - [x] `js/dashboard.js`: victoria se muestra como "Completó la campaña" (antes "Llegó a la cantina").
 - [x] Verificado en Chrome headless: nivel 4 inicia en 4/4, aparecen carros/avisos/perros/resbalones, se llega a la meta y overlay "¡A CASA!"; nivel 3 → intermisión → Enter → nivel 4 conserva puntos y vidas; niveles 1–3 sin errores; panel en `/4`, botón 4 en vivo, KPIs/historial/ranking/gráficas sin aviso de desajuste.
 - [x] Política de Supabase verificada con inserción anónima real `start_stage=4`, `stage_reached=4`.
+- [x] PR #9 mergeado (`90d4aa7`); etiqueta `v1.2-nivel-4`.
 - [ ] Limpieza: `delete from public.runs where client_run_id = 'test-nivel4-20261113';`.
 - [ ] Siguiente: Nivel 5 (cierre de la historia y continuidad de Pau).
