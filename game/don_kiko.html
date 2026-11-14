@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081b2b">
-<title>Don Kiko - 4 niveles, versión 2.2</title>
+<title>Don Kiko - 5 niveles, versión 2.3</title>
 <style>
 :root{color-scheme:dark;--bg:#08182b;--white:#eef6fb;--gold:#ffe19a;--border:#537999;--panel:#10263e}
 *{box-sizing:border-box}
@@ -57,15 +57,15 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
 <body>
 <main>
 <header class="top">
-  <div><h1>DON KIKO</h1><p class="subtitle">LA AVENTURA COMPLETA · 4 NIVELES · VERSIÓN 2.2</p></div>
+  <div><h1>DON KIKO</h1><p class="subtitle">LA AVENTURA COMPLETA · 5 NIVELES · VERSIÓN 2.3</p></div>
   <div class="hud" aria-live="polite">
-    <div class="stat level">NIVEL<strong id="levelNumber">1 / 4</strong></div>
+    <div class="stat level">NIVEL<strong id="levelNumber">1 / 5</strong></div>
     <div class="stat">PUNTOS<strong id="score">000000</strong></div>
     <div class="stat">VIDAS<strong id="lives">♥ ♥ ♥</strong></div>
     <div class="stat">RÉCORD<strong id="best">000000</strong></div>
   </div>
 </header>
-<div class="frame"><canvas id="game" width="1000" height="700" aria-label="Videojuego Don Kiko, cuatro niveles jugables"></canvas></div>
+<div class="frame"><canvas id="game" width="1000" height="700" aria-label="Videojuego Don Kiko, cinco niveles jugables"></canvas></div>
 <div class="toolbar">
   <div class="legend">
     <kbd>←</kbd><kbd>→</kbd> o <kbd>A</kbd><kbd>D</kbd> mover · <kbd>↑</kbd><kbd>↓</kbd> escaleras · <kbd>ESPACIO</kbd> saltar · <kbd>J</kbd> golpear · <kbd>P</kbd> pausa · <kbd>R</kbd> reiniciar nivel
@@ -89,8 +89,9 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
   <button data-level="2">Nivel 2</button>
   <button data-level="3">Nivel 3</button>
   <button data-level="4">Nivel 4</button>
+  <button data-level="5">Nivel 5</button>
 </section>
-<p class="info"><strong>Historia:</strong> Pau tiene encerrado a JuanMa, el mejor amigo de Don Kiko. Sube a rescatarlo en el nivel 1, escapen juntos por las azoteas en el nivel 2, lleguen a la cantina en el nivel 3 y vuelvan a casa en el nivel 4. <strong>Consejo:</strong> golpea los barriles de frente, salta los huecos y esquiva perros y automóviles. En el nivel 2, Pau avisa antes de dejar caer macetas; en el 3, los peligros están colocados en posiciones fijas y visibles. En el nivel 4, los carros avisan con faros y bocinazo antes de entrar, los perros despiertan si te acercas y los charcos te hacen resbalar; la borrachera mece la cámara y provoca traspiés, pero se desactiva cerca de los peligros para no ser injusta. Las vidas y los puntos se conservan al avanzar de nivel. En el nivel 3, Pau inicia una persecución autónoma tras el automóvil; si te alcanza, pierdes todas tus vidas y vuelves al nivel 1. Archivo HTML autónomo: funciona sin Internet.</p>
+<p class="info"><strong>Historia:</strong> Pau tiene encerrado a JuanMa, el mejor amigo de Don Kiko. Sube a rescatarlo en el nivel 1, escapen juntos por las azoteas en el nivel 2, lleguen a la cantina en el nivel 3, vuelvan a casa en el nivel 4 y sobrevivan al regaño de María en el nivel 5. <strong>Consejo:</strong> golpea los barriles de frente, salta los huecos y esquiva perros y automóviles. En el nivel 2, Pau avisa antes de dejar caer macetas; en el 3, los peligros están colocados en posiciones fijas y visibles. En el nivel 4, los carros avisan con faros y bocinazo antes de entrar, los perros despiertan si te acercas y los charcos te hacen resbalar; la borrachera mece la cámara y provoca traspiés, pero se desactiva cerca de los peligros para no ser injusta. En el nivel 5, María te espera despierta: esquiva chanclas, relojes, platos, botellas y cojines, elige la disculpa correcta para bajar su enojo y toma el café de la mesa (una sola vez) para recuperar una vida. Si pierdes con María, vuelves al nivel 4, no al 1. Las vidas y los puntos se conservan al avanzar de nivel. En el nivel 3, Pau inicia una persecución autónoma tras el automóvil; si te alcanza, pierdes todas tus vidas y vuelves al nivel 1. Archivo HTML autónomo: funciona sin Internet.</p>
 </main>
 <script>
 (() => {
@@ -103,7 +104,7 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const rand = (a, b) => a + Math.random() * (b - a);
   const hitBox = (a,b,ax,ay,bx,by) => Math.abs(ax-bx)<a && Math.abs(ay-by)<b;
-  const LEVEL_NAMES = ['','Rescate en el edificio','Escape por las azoteas','Rumbo a las chelas','De vuelta a casa'];
+  const LEVEL_NAMES = ['','Rescate en el edificio','Escape por las azoteas','Rumbo a las chelas','De vuelta a casa','La que se armó'];
   // Agregar un nivel = agregar su nombre aquí y su configuración en LEVELS.
   const TOTAL_LEVELS = LEVEL_NAMES.length - 1;
   const NUM_WORDS = {1:'Un',2:'Dos',3:'Tres',4:'Cuatro',5:'Cinco',6:'Seis',7:'Siete',8:'Ocho'};
@@ -112,9 +113,10 @@ body.embed canvas{width:100%;height:100%;object-fit:contain}
   const sprites={
  kiko:["......BBBBBB......","....BBBBBBBBBB....","...BBBBBBBBBBBB...","..BBBBTTTTBBBBBB..","..BBBTTTTTTBBBBB..",".BBBBTWTWTBBBBBBB",".BBBBTTKTTBBBBBBB","..BBBBTTTTBBBBBBB","..BBBBBBBBBBBBBB.",".BBBBBBBBBBBBBB..","BBBBBBBBBBBBBBBB..","BB.BBBBBBBBBB.BBB.","T...BBBBBBBB...TT.","....BBBBBBBB......","...BBBB..BBBB.....","..BBBB....BBBB....","..BBB......BBB...."],
  juan:["...RRRRRRRR...","..RRRRRRRRRR..","..KKKKKKKKK...","..KTTTKTTTT...","..TTTTTTTTTT..","...TTKTTTT....","..RRRRRRRRRR..",".RRBBBBBBBBRR.","RRRBBBBBBBBRRR","TT.BBBBBBBB.TT","...BBBBBBBB...","...BBBBBBBB...","...BB....BB...","..BBB....BBB..","..KKK....KKK.."],
- pau:[".....KKKKK.....","...KKKKKKKK....","...KKTTTTKK....","..KKTTWTTKK....","..KKTTTTTKK....","...KTTTTTKK....","...KKKTTKKK....","...TTTRRTT.....","..RRRRRRRRR....",".RRRRRRRRRRR...","..RRRRRRRR....","...RRRRRRR.....","....RRRRRR.....","....RR..RR.....","...RR....RR....","..KK......KK..."]
+ pau:[".....KKKKK.....","...KKKKKKKK....","...KKTTTTKK....","..KKTTWTTKK....","..KKTTTTTKK....","...KTTTTTKK....","...KKKTTKKK....","...TTTRRTT.....","..RRRRRRRRR....",".RRRRRRRRRRR...","..RRRRRRRR....","...RRRRRRR.....","....RRRRRR.....","....RR..RR.....","...RR....RR....","..KK......KK..."],
+ maria:["....KKKKKKKK....","..KKKKKKKKKKKK..","..KKWWKKKKWWKK..","..KKTTTTTTTTKK..","..KTTTTTTTTTTK..","..KTTKTTTTKTTK..","..KTTTTTTTTTTK..","..KTTTTKKTTTTK..","...KTTTTTTTTK...","....TTTTTTTT....","...PPPPPPPPPP...","..PPPPPPPPPPPP..",".PPPTPPPPPPTTPP.",".PPPTPPPPPPTTPP.","..PPPPPPPPPPPP..","..PPPPPPPPPPPP..","..PPPPPPPPPPPP..","..PPP......PPP..","..KKK......KKK.."]
 };
-const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
+const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560',P:'#8e5f8a'};
 
   // ---------- Puente de telemetría para el dashboard ----------
   // Envía mensajes al padre (dashboard) sin alterar la lógica del juego.
@@ -169,6 +171,33 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   const HOME_DOGS = [880,1440,1980];
   const HOME_PUDDLES = [{x:380,w:110},{x:960,w:130},{x:1560,w:120},{x:2100,w:110}];
   const HOME_QUIPS = ['¡Yo vivo por aquí!','¿Esta es mi casa?','¡Shhh, no despiertes al perro!','¡Esa no era la puerta!','¡Ya casi llegamos!','¡Una más y llegamos!'];
+  // ---------- Nivel 5: La que se armó ----------
+  const ROOM_W = 1000;
+  const MARIA_X = 820;
+  const COFFEE_X = 452;
+  const BOSS_ANGER_MAX = 3;
+  const BOSS_ROUNDS = [
+    {queja:'¡LLEGASTE A LAS 4 DE LA MAÑANA!',hint:'ESQUIVA RELOJES Y CHANCLAS',time:16},
+    {queja:'¡HUELES A CANTINA!',hint:'SALTA LAS BOTELLAS · CUIDADO CON EL HUMO',time:18},
+    {queja:'¡Y CON JUANMA!',hint:'AGUANTA EL ÚLTIMO REGAÑO',time:20}
+  ];
+  const BOSS_QUESTIONS = [
+    [
+      {text:'Perdón, tienes razón.',ok:true},
+      {text:'Fue culpa de JuanMa.',ok:false},
+      {text:'¿Qué hora es?',ok:false}
+    ],
+    [
+      {text:'Tienes razón, voy a bañarme.',ok:true},
+      {text:'Es perfume de cantina.',ok:false},
+      {text:'Huele a éxito.',ok:false}
+    ],
+    [
+      {text:'No vuelvo a ir sin avisarte.',ok:true},
+      {text:'JuanMa es mi compa.',ok:false},
+      {text:'¿Estás celosa?',ok:false}
+    ]
+  ];
   const groundAt = x => !holes.some(h=>x > h.a && x < h.b);
   const roofAt = x => roofs.find(r=>x>=r.a && x<=r.b);
   let stage = 1, phase = 'menu', lives=3, score=0, best=0, time=0;
@@ -180,6 +209,8 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   // Estado del nivel 4 (tráfico, perros y tambaleo).
   let trafficCars=[], carWarn=[], carTimer=0, homeDogState=[], puddleLast=-1, slipT=0, slipDir=0;
   let driftPhase=0, stumbleT=0, stumbleDir=1, nextStumble=0, hiccupT=0, quipT=0, quip='', quipShow=0;
+  // Estado del nivel 5 (jefe: enojo de María, regaños y disculpas).
+  let boss=null, retryScore=0;
   try {best=Number(localStorage.getItem('donkiko_best')||0);} catch(e){}
 
   function sound(hz=340,d=.08,kind='square',gain=.026){
@@ -216,17 +247,20 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     pauChase={active:false,x:0};lostToPau=false;pauRestartCountdown=0;surveyHold=false;
     trafficCars=[];carWarn=[];carTimer=2.6;homeDogState=HOME_DOGS.map(x=>({x,baseX:x,state:'sleep',t:0,armed:true}));
     puddleLast=-1;slipT=0;slipDir=0;driftPhase=0;stumbleT=0;nextStumble=rand(6.5,10.5);hiccupT=rand(12,18);quipT=rand(6,9);quip='';quipShow=0;
+    if(n===4)retryScore=score; // Punto de retorno si María manda al sillón desde el nivel 5.
     const cfg=levelOf(stage), setup=cfg.start();
     player=setup.player;friend=setup.friend;checkpoint=setup.checkpoint;
     objects=setup.objects;tokens=setup.tokens;
+    boss=n===5?makeBoss():null;
     updateHud();flash(cfg.flash,2.8);
   }
   function begin(level=1){
-    score=0;lives=3;time=0;initializeStage(level);phase='playing';clearKeys();updateHud();chime();
+    score=0;lives=3;time=0;retryScore=0;initializeStage(level);phase='playing';clearKeys();updateHud();chime();
     emit('run_start',{level,stage,lives,score});
     sendSnapshot();
   }
   function proceed(){
+    if(phase==='retry'){retryLevel();return;}
     if(phase==='menu'||phase==='lost'||phase==='won'){begin(1);return;}
     if(phase==='intermission'){initializeStage(Math.min(TOTAL_LEVELS,stage+1));phase='playing';updateHud();chime();return;}
     if(phase==='paused'){phase='playing';updateHud();return;}
@@ -265,7 +299,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     lives--;shake=.27;sound(105,.3,'sawtooth');
     burst(player.x,player.bottom-27,'#ffe5ad',16);
     emit('hurt',{cause:fall?'fall':'hazard',stage,lives,x:Math.round(player.x)});
-    if(lives<=0){lives=0;phase='lost';saveScore();updateHud();emit('game_over',{stage,score,cause:fall?'fall':'hazard'});return;}
+    if(lives<=0){endRunOrRetry(fall?'fall':'hazard');return;}
     if(fall){
       levelOf(stage).respawn(player,friend,checkpoint);
       player.vy=0;player.grounded=true;player.air=false;
@@ -274,6 +308,25 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
       if(levelOf(stage).airKnockback)player.air=true;else player.grounded=false;
     }
     player.inv=2.1;flash(fall?'¡Cuidado con el hueco!':'¡Aguas con los obstáculos!',1.8);updateHud();
+  }
+  function endRunOrRetry(cause='hazard'){
+    lives=0;saveScore();
+    const retry=levelOf(stage).retryStage;
+    if(retry){
+      // Nivel 5: el regaño no cierra la campaña; se vuelve al nivel 4 conservando la corrida.
+      phase='retry';clearKeys();
+    }else{
+      phase='lost';
+    }
+    updateHud();
+    if(retry)emit('retry',{from:stage,to:retry,score,cause});
+    else emit('game_over',{stage,score,cause});
+  }
+  function retryLevel(){
+    const to=levelOf(stage).retryStage||1;
+    score=retryScore;lives=3;clearKeys();
+    initializeStage(to);
+    phase='playing';updateHud();chime();sendSnapshot();
   }
   function completeStage(){
     if(phase!=='playing')return;
@@ -597,6 +650,170 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     if(quipShow>0)quipShow-=dt;
     if(player.x>HOME_WIDTH-130&&player.grounded&&Math.abs(player.x-friend.x)<125)completeStage();
   }
+  // ---------- Nivel 5: el pleito con María ----------
+  function makeBoss(){
+    return {
+      anger:BOSS_ANGER_MAX,round:0,phase:'intro',timer:2.2,
+      choices:[],selected:0,shots:[],spawnTimer:1.2,pattern:0,
+      coffeeSpawned:false,coffee:null,coffeeTaken:false,
+      sober:0,drunkBoost:0,said:'',flashT:0
+    };
+  }
+  function shuffleChoices(list){
+    for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
+    return list;
+  }
+  function bossTarget(){return clamp(player.x,70,ROOM_W-140);}
+  function bossSpawnArc(type,flight=.85,startX=MARIA_X-26,startY=STREET_Y-74){
+    const g=980,tx=bossTarget(),ty=STREET_Y-10;
+    const vx=(tx-startX)/flight;
+    const vy=(ty-startY-.5*g*flight*flight)/flight;
+    const r=type==='cushion'?18:type==='clock'?15:type==='frame'?14:12;
+    boss.shots.push({
+      type,x:startX,y:startY,vx,vy,r,landX:tx,
+      rot:type==='chancla'? .4:0,spin:type==='clock'?8:type==='frame'?4:type==='cushion'?2:0
+    });
+    sound(type==='plate'?360:type==='cushion'?220:420,.06,'triangle',.012);
+  }
+  function spawnBottle(){
+    boss.shots.push({type:'bottle',x:ROOM_W-14,y:STREET_Y-9,vx:-rand(180,220),r:10,rot:0,spin:0});
+    sound(260,.07,'triangle',.012);
+  }
+  function spawnSmoke(){
+    boss.shots.push({type:'smoke',x:MARIA_X-40,y:STREET_Y-58,vx:-rand(95,125),vy:-8,r:28,t:5,hit:false,rot:0,spin:0});
+    sound(160,.16,'sawtooth',.014);
+  }
+  function spawnBossHazard(){
+    const r=boss.round;
+    boss.pattern++;
+    if(r===0){
+      bossSpawnArc(boss.pattern%2===0?'chancla':'clock',rand(1.1,1.3));
+    }else if(r===1){
+      const k=boss.pattern%4;
+      if(k===0)spawnBottle();
+      else if(k===1)bossSpawnArc('plate',1.15,930,STREET_Y-150);
+      else if(k===2)bossSpawnArc('chancla',1.05);
+      else{spawnBottle();bossSpawnArc('plate',1.2,930,STREET_Y-150);}
+      if(boss.pattern===4||boss.pattern===9)spawnSmoke();
+    }else{
+      bossSpawnArc(boss.pattern%2===0?'frame':'chancla',rand(1.0,1.15));
+      if(boss.pattern%3===0)bossSpawnArc('cushion',rand(1.1,1.25),900,STREET_Y-120);
+      if(boss.pattern%6===0)spawnBottle();
+    }
+  }
+  function updateBossShots(dt){
+    const g=980;
+    for(const s of boss.shots){
+      s.rot=(s.rot||0)+dt*(s.spin||0);
+      if(s.type==='bottle'){
+        s.x+=s.vx*dt;
+        if(s.x<50){s.dead=true;continue;}
+      }else if(s.type==='smoke'){
+        s.x+=s.vx*dt;s.y+=s.vy*dt;s.r+=16*dt;s.t-=dt;
+        if(s.t<=0){s.dead=true;continue;}
+        if(!s.hit&&Math.abs(s.x-player.x)<s.r+18&&Math.abs(s.y-(player.bottom-30))<s.r+34){
+          s.hit=true;boss.drunkBoost=6;boss.sober=0;
+          flash('¡HUMO DE CANTINA! TAMBALEO +6 s',1.7);
+          sound(150,.2,'sawtooth',.02);
+          burst(player.x,player.bottom-35,'#bfe0c1',10);
+        }
+        continue;
+      }else{
+        s.vy+=g*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;
+        if(s.vy>0&&s.y>=STREET_Y-8){
+          s.dead=true;
+          burst(s.x,STREET_Y-6,s.type==='plate'?'#e8f1f5':'#e3b27e',7);
+          sound(s.type==='plate'?300:200,.07,'triangle',.014);
+          continue;
+        }
+      }
+      if(s.dead)continue;
+      const bodyTop=player.bottom-64,bodyBottom=player.bottom+2;
+      if(Math.abs(s.x-player.x)<s.r+14&&s.y>bodyTop+2&&s.y<bodyBottom-4){
+        s.dead=true;
+        hurt();
+        if(phase!=='playing'){boss.shots=boss.shots.filter(x=>!x.dead);return;}
+      }
+    }
+    boss.shots=boss.shots.filter(s=>!s.dead);
+  }
+  function bossPenalty(msg){
+    if(phase!=='playing')return false;
+    lives--;shake=.3;sound(105,.3,'sawtooth');
+    burst(player.x,player.bottom-27,'#ffd0d0',16);
+    emit('hurt',{cause:'hazard',stage,lives,x:Math.round(player.x)});
+    updateHud();
+    if(lives<=0){endRunOrRetry('hazard');return true;}
+    player.inv=Math.max(player.inv,1.4);
+    flash(msg,1.8);
+    return false;
+  }
+  function confirmBossChoice(){
+    if(!boss||boss.phase!=='choose'||phase!=='playing')return;
+    const choice=boss.choices[boss.selected];
+    if(!choice)return;
+    if(choice.ok){
+      boss.anger=Math.max(0,boss.anger-1);
+      score+=500;saveScore();updateHud();
+      boss.phase='feedback';boss.timer=1.9;boss.said='¡BIEN DICHO!';boss.flashT=1.9;
+      flash('+500 · ¡BIEN DICHO!',1.7);
+      burst(player.x,player.bottom-45,'#9fe6b0',18);
+      sound(660,.14,'triangle');
+      if(!boss.coffeeSpawned&&boss.anger>0){
+        boss.coffeeSpawned=true;boss.coffee={x:COFFEE_X,y:536};
+        flash('☕ ¡CAFÉ DISPONIBLE EN LA MESA!',2.3);
+      }
+    }else{
+      boss.said='¡ESA NO ERA!';boss.flashT=1.9;
+      if(bossPenalty('¡ESA NO ERA! +6 s DE REGAÑO'))return;
+      boss.phase='rant';boss.timer+=6;boss.spawnTimer=1.4;
+    }
+  }
+  function updateStageFive(dt){
+    if(!boss)return;
+    boss.flashT=Math.max(0,boss.flashT-dt);
+    if(boss.sober>0)boss.sober=Math.max(0,boss.sober-dt);
+    if(boss.drunkBoost>0)boss.drunkBoost=Math.max(0,boss.drunkBoost-dt);
+    // Café: una sola vez en todo el jefe. Si está lleno de vidas, se queda en la mesa.
+    if(boss.coffee&&!boss.coffeeTaken&&lives<3&&Math.abs(player.x-boss.coffee.x)<46){
+      boss.coffeeTaken=true;boss.coffee=null;boss.sober=8;
+      lives++;flash('¡CAFÉ! +1 VIDA · TAMBALEO -8 s',2.1);
+      burst(COFFEE_X,540,'#ffe9b0',14);sound(560,.16,'triangle');updateHud();
+    }
+    if(boss.phase==='intro'){
+      boss.timer-=dt;
+      if(boss.timer<=0){boss.phase='rant';boss.timer=BOSS_ROUNDS[boss.round].time;boss.spawnTimer=1.4;boss.pattern=0;}
+    }else if(boss.phase==='rant'){
+      boss.timer-=dt;
+      updateBossShots(dt);
+      if(phase!=='playing')return;
+      boss.spawnTimer-=dt;
+      if(boss.spawnTimer<=0&&boss.shots.length<6){
+        spawnBossHazard();
+        boss.spawnTimer=boss.round===0?rand(2.4,3.0):boss.round===1?rand(2.0,2.6):rand(1.9,2.5);
+      }
+      if(boss.timer<=0){
+        boss.phase='choose';boss.choices=shuffleChoices(BOSS_QUESTIONS[boss.round].map(o=>({...o})));
+        boss.selected=0;boss.shots=[];clearKeys();sound(480,.1,'triangle');
+      }
+    }else if(boss.phase==='feedback'){
+      boss.timer-=dt;
+      if(boss.timer<=0){
+        if(boss.anger<=0){boss.phase='done';boss.timer=2.8;}
+        else{boss.round++;boss.phase='intro';boss.timer=2.0;boss.spawnTimer=1.0;}
+      }
+    }else if(boss.phase==='done'){
+      boss.timer-=dt;
+      if(boss.timer<=0){completeStage();return;}
+    }
+    // Movimiento sólo durante la intro y el regaño. Al elegir, Don Kiko se queda quieto.
+    if(boss.phase==='intro'||boss.phase==='rant'){
+      const drift=(boss.drunkBoost>0&&boss.sober<=0)?Math.sin(elapsed*TAU*.9)*260*.07*dt:0;
+      updatePlatformPlayer(dt,[{a:0,b:ROOM_W,y:STREET_Y}],1090,240,drift);
+      if(phase!=='playing')return;
+      if(player.x>MARIA_X-66)player.x=MARIA_X-66;
+    }
+  }
   function update(dt){
     for(const n of notices)n.t-=dt;notices=notices.filter(n=>n.t>0);
     for(const a of particles){a.vy+=390*dt;a.x+=a.vx*dt;a.y+=a.vy*dt;a.life-=dt;}
@@ -883,6 +1100,174 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     drawProgressBar(player.x/cfg.progress.end,cfg.progress.label);
     txt(typeof cfg.hint==='function'?cfg.hint():cfg.hint,440,63,13,'#e6eac1');
   }
+  // ---------- Nivel 5: dibujo de la sala y del pleito ----------
+  function drawHomeWindow(){
+    // Noche, luna y estrellas detrás de Pau y JuanMa.
+    box(62,248,196,184,'#0b2036','#d8c39d');
+    rect(70,256,180,168,'#102f4a');
+    circle(214,286,20,'#f4e4ac');circle(224,278,18,'#102f4a');
+    for(const [x,y] of [[92,278],[118,304],[160,272],[98,344],[200,338],[142,358]])rect(x,y,2,2,'#cfe2f0');
+    const bob=Math.sin(elapsed*2.2)*1.5;
+    sprite(sprites.juan,112,438+bob,2.9);
+    sprite(sprites.pau,180,438-bob,2.9);
+    if(boss&&(boss.anger===0||boss.phase==='done'))txt('♥',196,382,18,'#ff9fb2','center');
+    else txt('...',196,382,15,'#d6e8f2','center');
+    // Marco, cortinas y alféizar.
+    rect(56,248,14,196,'#7b3f4a');rect(250,248,14,196,'#7b3f4a');
+    rect(150,256,6,168,'#d8c39d');
+    rect(62,424,196,12,'#b79a72');
+    rect(70,436,180,8,'#8e7354');
+  }
+  function drawLivingRoom(){
+    // Pared con papel tapiz.
+    rect(0,38,W,547,'#3c334b');
+    for(let x=0;x<W;x+=52)rect(x,38,3,547,'#473c58');
+    for(let y=110;y<585;y+=74)for(let x=26;x<W;x+=104)rect(x,y,7,7,'#5a4c6a');
+    // Zócalo y piso de madera.
+    rect(0,570,W,18,'#241d2e');
+    rect(0,585,W,80,'#6a4736');
+    for(let x=0;x<W;x+=82){rect(x,585,2,80,'#593a2c');rect(x+40,585,1,80,'#7a5542');}
+    for(let i=0;i<9;i++)rect(0,600+i*9,W,1,'#00000018');
+    drawHomeWindow();
+    // Cuadros.
+    box(298,168,104,78,'#23384a','#c9a97e');
+    rect(306,176,88,62,'#35566a');circle(350,204,12,'#e2c98f');rect(306,214,88,24,'#577b7c');
+    box(420,150,74,96,'#23384a','#c9a97e');
+    rect(428,158,58,80,'#35566a');txt('★',457,206,30,'#ffe4a0','center');
+    // Reloj: las 4 de la mañana.
+    circle(540,190,38,'#e7d8b7');circle(540,190,32,'#fff6dc');circle(540,190,3,'#3a2a20');
+    line(540,190,540,166,'#3a2a20',3);line(540,190,558,196,'#3a2a20',3);
+    txt('4:00',540,244,13,'#e8d6ae','center');
+    // Lámpara de pie.
+    rect(36,430,5,155,'#5b4a3c');
+    ctx.fillStyle='#e8cd8e';ctx.beginPath();ctx.moveTo(10,430);ctx.lineTo(68,430);ctx.lineTo(54,394);ctx.lineTo(24,394);ctx.closePath();ctx.fill();
+    ctx.globalAlpha=.16;circle(39,432,42,'#ffe7a6');ctx.globalAlpha=1;
+    // Televisor.
+    box(248,438,150,112,'#182737','#7f99a8');
+    rect(256,446,134,80,'#0c1a27');
+    rect(266,454,114,64,'#163a4a');
+    txt('SIN SEÑAL',323,492,12,'#6f9caf','center');
+    rect(300,550,44,14,'#3c4d5b');
+    // Sofá.
+    rect(560,492,230,93,'#774b5b');rect(548,516,254,62,'#8a5a6a');
+    rect(568,476,102,70,'#8a5a6a');rect(676,476,102,70,'#8a5a6a');
+    rect(576,506,88,30,'#9d6a7a');rect(684,506,88,30,'#9d6a7a');
+    rect(560,560,230,14,'#5e3a48');rect(548,574,18,14,'#4a2e3a');rect(784,574,18,14,'#4a2e3a');
+    // Mesa y café.
+    rect(400,540,116,10,'#8a5a3e');rect(408,550,8,32,'#6e4630');rect(500,550,8,32,'#6e4630');
+    if(boss&&boss.coffee&&!boss.coffeeTaken){
+      rect(COFFEE_X-9,522,18,18,'#f3ead7');rect(COFFEE_X+9,526,6,7,'#f3ead7');rect(COFFEE_X-5,528,10,3,'#8e5a3d');
+      txt('☕',COFFEE_X,518,13,'#ffd88a','center');
+      ctx.globalAlpha=.2;circle(COFFEE_X,512,16,'#ffe7a6');ctx.globalAlpha=1;
+    }
+    // Puerta a la cocina.
+    box(908,318,74,267,'#2b2336','#a98b6b');
+    rect(916,326,58,251,'#6d4a38');
+    circle(922,462,4,'#ffe6a8');
+    txt('COCINA',945,300,12,'#d8c29c','center');
+  }
+  function drawBossShot(s){
+    ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));
+    if(s.type==='smoke'){
+      ctx.globalAlpha=.22;circle(0,0,s.r,'#a8c6a6');circle(s.r*.4,-s.r*.3,s.r*.55,'#bfd9bb');circle(-s.r*.4,s.r*.2,s.r*.5,'#9db99b');ctx.globalAlpha=1;
+    }else if(s.type==='bottle'){
+      ctx.rotate(Math.PI/2);bottle(0,0);
+    }else if(s.type==='plate'){
+      circle(0,0,s.r,'#e9f1f3');circle(0,0,s.r*.62,'#b9d4dd');circle(0,0,s.r*.2,'#8e4e2e');
+    }else if(s.type==='clock'){
+      ctx.rotate(s.rot||0);circle(0,0,s.r,'#e8dcc0');circle(0,0,s.r-3,'#fff8e0');
+      line(0,0,0,-(s.r-5),'#4b3a2d',2);line(0,0,(s.r-7)*.8,0,'#4b3a2d',2);circle(0,0,2,'#4b3a2d');
+    }else if(s.type==='chancla'){
+      ctx.rotate(s.rot||.4);
+      rect(-s.r,-6,s.r*2,12,'#8a4c3d');rect(-s.r+2,-4,s.r*2-4,8,'#c98a63');
+      line(-s.r+5,0,s.r-5,0,'#5b3229',2);
+      ctx.strokeStyle='#5b3229';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,5,Math.PI,TAU);ctx.stroke();
+    }else if(s.type==='cushion'){
+      ctx.rotate(s.rot||0);box(-s.r,-s.r*.62,s.r*2,s.r*1.24,'#b46a76','#e5b0a6');
+      rect(-s.r*.55,-s.r*.3,s.r*1.1,4,'#e8c2b8');
+    }else if(s.type==='frame'){
+      ctx.rotate(s.rot||0);box(-s.r,-s.r*.8,s.r*2,s.r*1.6,'#6f4b35','#e6c58f');
+      rect(-s.r+4,-s.r*.8+4,s.r*2-8,s.r*1.6-8,'#9fc4c9');circle(0,0,3,'#ffe4a0');
+    }
+    ctx.restore();
+  }
+  function drawBossShadows(){
+    for(const s of boss.shots){
+      if(s.type==='smoke')continue;
+      if(s.type==='bottle'){
+        ctx.fillStyle='#00000055';ctx.beginPath();ctx.ellipse(s.x,STREET_Y+1,12,4,0,0,TAU);ctx.fill();
+      }else{
+        ctx.globalAlpha=.3;ctx.fillStyle='#08131f';
+        ctx.beginPath();ctx.ellipse(s.landX,STREET_Y+2,17,5,0,0,TAU);ctx.fill();ctx.globalAlpha=1;
+        if(Math.floor(elapsed*8)%2===0)circle(s.landX,STREET_Y-10,4,'#ffcf7a');
+      }
+    }
+  }
+  function drawMaria(){
+    ctx.fillStyle='#00000033';ctx.beginPath();ctx.ellipse(MARIA_X,STREET_Y+2,34,7,0,0,TAU);ctx.fill();
+    sprite(sprites.maria,MARIA_X,STREET_Y,3.15);
+    if(!boss)return;
+    if(boss.phase==='rant'||boss.phase==='intro'){
+      speech(BOSS_ROUNDS[boss.round].queja,600,404,280);
+      ctx.save();ctx.translate(MARIA_X-30,STREET_Y-88+Math.sin(elapsed*10)*3);ctx.rotate(-.7);
+      rect(-13,-5,26,10,'#8a4c3d');rect(-11,-3,22,6,'#c98a63');ctx.restore();
+      txt('!',MARIA_X+28,STREET_Y-92,24,'#ff9a9a','center');
+    }else if(boss.phase==='choose'||boss.phase==='feedback'){
+      rect(MARIA_X-24,STREET_Y-52,48,7,'#e7aa68');
+    }
+    if(boss.anger===0)txt('♥',MARIA_X+34,STREET_Y-98+Math.sin(elapsed*3)*2,20,'#ff9fb2','center');
+    if(boss.said&&boss.flashT>0)speech(boss.said,MARIA_X-95,STREET_Y-150,190);
+  }
+  function drawBossPrompt(){
+    if(!boss||boss.phase!=='choose')return;
+    rect(0,38,W,627,'#04101cbb');
+    box(150,240,700,330,'#10263a','#f0d69a');
+    txt('MARÍA:',500,276,18,'#ffb3b8','center');
+    txt(BOSS_ROUNDS[boss.round].queja,500,306,22,'#ffe4a8','center');
+    txt('¿QUÉ LE CONTESTAS?',500,336,15,'#a9c6d8','center');
+    for(let i=0;i<boss.choices.length;i++){
+      const y=356+i*56,on=i===boss.selected;
+      box(186,y,628,46,on?'#d5a657':'#173a55',on?'#ffe2a5':'#5f8299');
+      txt(on?'▶':' ',206,y+30,16,on?'#112a3d':'#8fb2c8');
+      txt(boss.choices[i].text,226,y+30,17,on?'#112a3d':'#e8f2fa');
+    }
+    txt('← → ELEGIR  ·  J / ENTER CONFIRMAR',500,532,13,'#cfe3ee','center');
+  }
+  function drawAngerBar(){
+    if(!boss)return;
+    txt('ENOJO DE MARÍA',19,51,12,'#f3d6a4');
+    for(let i=0;i<BOSS_ANGER_MAX;i++){
+      const x=19+i*96,on=i<boss.anger;
+      rect(x,58,86,14,on?(i===2?'#e95560':i===1?'#e88a5e':'#e8c278'):'#243243');
+      ctx.strokeStyle='#f3d6a4';ctx.lineWidth=1;ctx.strokeRect(x,58,86,14);
+    }
+    const cx=330,cy=65;
+    circle(cx,cy,14,'#e7aa68');rect(cx-9,cy-10,18,7,'#1a1924');
+    rect(cx-7,cy-3,3,3,'#1a1924');rect(cx+4,cy-3,3,3,'#1a1924');
+    if(boss.anger>0)line(cx-6,cy+8,cx+6,cy+8,'#7a2f2f',2);
+    else{ctx.strokeStyle='#7a2f2f';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy+3,6,0,Math.PI);ctx.stroke();}
+  }
+  function drawBossHint(){
+    if(!boss)return;
+    let h='SOBREVIVE AL REGAÑO';
+    if(boss.phase==='intro')h='PREPÁRATE...';
+    else if(boss.phase==='rant')h=BOSS_ROUNDS[boss.round].hint;
+    else if(boss.phase==='choose')h='MARÍA ESPERA TU RESPUESTA';
+    else if(boss.phase==='feedback')h=boss.anger>0?'¡BIEN! SIGUE ASÍ':'¡CASI LO TIENES!';
+    else if(boss.phase==='done')h='¡PERDÓN CONCEDIDO!';
+    txt(h,440,63,13,'#e6eac1');
+  }
+  function drawStageFive(){
+    drawLivingRoom();
+    drawMaria();
+    drawBossShadows();
+    for(const s of boss.shots)drawBossShot(s);
+    drawCharacters();
+    for(const a of particles)rect(a.x,a.y,5,5,a.color);
+    drawBossPrompt();
+    drawAngerBar();
+    drawBossHint();
+  }
   // ---------- Configuración de niveles ----------
   // Cada nivel declara arranque, física, acompañante, dibujo y meta.
   // Agregar un nivel nuevo = agregar su nombre en LEVEL_NAMES y una entrada aquí.
@@ -1032,12 +1417,51 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
       draw: drawStageFour,
       progress: {end:2380,label:'CASA'},
       hint: () => (carWarn.length||trafficCars.some(c=>Math.abs(c.x-player.x)<300))?'¡SALTA LOS CARROS!  ·  FAROS = AVISO':'CUIDADO CON LOS PERROS Y LOS CHARCOS',
-      finale: {
-        title: '¡A CASA!',
+      intermission: {
+        title: '¡LLEGARON A CASA!',
         lines: score => [
-          'Don Kiko y JuanMa llegaron a la puerta.',
-          'Mañana será otro día... si es que llegan despiertos.',
-          `Puntuación final: ${score}`
+          'La luz del porche está encendida... y María está despierta.',
+          'Don Kiko respira hondo antes de abrir la puerta.',
+          'Siguiente: NIVEL 5 · LA QUE SE ARMÓ',
+          `Puntuación acumulada: ${score}`
+        ]
+      }
+    },
+    5: {
+      width: ROOM_W,
+      camera: false,
+      jump: 'platform',
+      airKnockback: false,
+      showCompanion: false,
+      showFloor: false,
+      retryStage: 4,
+      mission: 'MISIÓN: SOBREVIVIR AL REGAÑO Y GANARTE EL PERDÓN',
+      flash: 'María te espera despierta...',
+      start(){
+        return {
+          player: playerAt(118,STREET_Y),
+          friend: {x:64,bottom:STREET_Y},
+          checkpoint: 118,
+          objects: [],
+          tokens: []
+        };
+      },
+      respawn(player,friend,checkpoint){
+        player.x=checkpoint;player.bottom=STREET_Y;
+        friend.x=checkpoint-54;friend.bottom=STREET_Y;
+      },
+      companion: {mode:'street',pace:300},
+      update: updateStageFive,
+      draw: drawStageFive,
+      progress: {end:ROOM_W,label:'ENOJO'},
+      hint: () => (boss?BOSS_ROUNDS[boss.round].hint:'SOBREVIVE AL REGAÑO'),
+      finale: {
+        title: '¡PERDÓN CONCEDIDO!',
+        lines: score => [
+          'María dejó la chancla sobre la mesa.',
+          '"Está bien... pero mañana lavas los platos."',
+          'JuanMa: "Yo invito el café." · Pau sonríe desde la ventana.',
+          `FIN DE LA CAMPAÑA · Puntuación final: ${score}`
         ]
       }
     }
@@ -1080,8 +1504,9 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   }
   function drawOverlays(){
     if(phase==='menu')overlay('DON KIKO: LA AVENTURA',[
-      `${numberWord(TOTAL_LEVELS)} niveles para volver a casa con JuanMa.`,
-      ...Object.keys(LEVELS).map(n=>`${n} · ${LEVEL_NAMES[n]}`)
+      `${numberWord(TOTAL_LEVELS)} niveles para volver a casa... y sobrevivir a María.`,
+      '1 Rescate · 2 Azoteas · 3 Cantina',
+      `4 De vuelta a casa · ${TOTAL_LEVELS} ${LEVEL_NAMES[TOTAL_LEVELS]}`
     ],'#ffe19b','ENTER O ▶ JUGAR');
     if(phase==='paused')overlay('PAUSA',[
       'JuanMa todavía tiene ganas de salir.',
@@ -1098,6 +1523,14 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
           `Puntuación acumulada: ${score}`
         ],'#a7edbe','ENTER / SIGUIENTE NIVEL');
       }
+    }
+    if(phase==='retry'){
+      const to=levelOf(stage).retryStage||1;
+      overlay('¡TE MANDÓ AL SILLÓN!',[
+        'María no quiere verte ahora mismo.',
+        `Vuelves al NIVEL ${to} · ${LEVEL_NAMES[to].toUpperCase()}.`,
+        `Puntuación al volver: ${retryScore}`
+      ],'#ffb5b6',`ENTER / VOLVER AL NIVEL ${to}`);
     }
     if(phase==='lost')overlay(lostToPau?'¡PAU LOS ATRAPÓ!':'¡GAME OVER!',[
       lostToPau?'¡Pau alcanzó a Don Kiko! ¡Perdiste los 3 corazones!':'Don Kiko se quedó sin vidas.',
@@ -1130,18 +1563,40 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
     if(k==='arrowup'||k==='w')return'up';if(k==='arrowdown'||k==='s')return'down';
     if(k===' '||k==='spacebar'||k==='k')return'jump';if(k==='j'||k==='x')return'punch';return null;
   }
+  function handleBossKey(e){
+    if(stage!==5||!boss||boss.phase!=='choose'||phase!=='playing')return false;
+    const k=e.key.toLowerCase();
+    if(k==='arrowleft'||k==='a'){
+      e.preventDefault();boss.selected=(boss.selected+boss.choices.length-1)%boss.choices.length;sound(420,.04);return true;
+    }
+    if(k==='arrowright'||k==='d'){
+      e.preventDefault();boss.selected=(boss.selected+1)%boss.choices.length;sound(440,.04);return true;
+    }
+    if(k==='enter'||k===' '||k==='spacebar'||k==='j'||k==='x'||k==='k'){
+      e.preventDefault();confirmBossChoice();return true;
+    }
+    if(k==='arrowup'||k==='arrowdown'||k==='w'||k==='s'){e.preventDefault();return true;}
+    return false;
+  }
   window.addEventListener('keydown',e=>{
+    if(handleBossKey(e))return;
     const k=mapKey(e.key);
     if(k){e.preventDefault();if(!keys[k]){if(k==='jump')jump();if(k==='punch')punch();}keys[k]=true;}
     if(e.key.toLowerCase()==='p'){e.preventDefault();togglePause();}
-    if(e.key.toLowerCase()==='r'){e.preventDefault();begin(phase==='lost'?1:stage);}
+    if(e.key.toLowerCase()==='r'){e.preventDefault();if(phase==='retry')retryLevel();else begin(phase==='lost'?1:stage);}
     if(e.key==='Enter'){e.preventDefault();proceed();}
   });
   window.addEventListener('keyup',e=>{const k=mapKey(e.key);if(k){e.preventDefault();keys[k]=false;}});
   window.addEventListener('blur',()=>{clearKeys();if(phase==='playing'){phase='paused';updateHud();}});
   for(const btn of document.querySelectorAll('[data-key]')){
     const k=btn.dataset.key;
-    const press=e=>{e.preventDefault();btn.setPointerCapture?.(e.pointerId);if(!keys[k]){if(k==='jump')jump();if(k==='punch')punch();}keys[k]=true;btn.classList.add('pressed');};
+    const press=e=>{e.preventDefault();btn.setPointerCapture?.(e.pointerId);
+      if(stage===5&&boss&&boss.phase==='choose'&&phase==='playing'){
+        if(k==='left'||k==='right'){boss.selected=(boss.selected+(k==='right'?1:boss.choices.length-1))%boss.choices.length;sound(420,.04);}
+        else if(k==='jump'||k==='punch'){confirmBossChoice();}
+        return;
+      }
+      if(!keys[k]){if(k==='jump')jump();if(k==='punch')punch();}keys[k]=true;btn.classList.add('pressed');};
     const release=e=>{e.preventDefault();keys[k]=false;btn.classList.remove('pressed');};
     btn.addEventListener('pointerdown',press);btn.addEventListener('pointerup',release);
     btn.addEventListener('pointercancel',release);btn.addEventListener('lostpointercapture',release);
@@ -1152,7 +1607,7 @@ const pal={B:'#8e4e2e',T:'#e7aa68',W:'#fff9ec',K:'#1a1924',R:'#e95560'};
   $('soundBtn').addEventListener('click',()=>{muted=!muted;$('soundBtn').textContent=muted?'♫ Sonido: no':'♫ Sonido: sí';if(!muted)sound(490,.07);});
   document.querySelectorAll('[data-level]').forEach(b=>b.addEventListener('click',()=>begin(Number(b.dataset.level))));
   // Read-only state is exposed to help inspect a running student prototype.
-  window.donKikoStatus=()=>({phase,stage,score,lives,x:Math.round(player.x),y:Math.round(player.bottom),friendX:Math.round(friend.x),objects:objects.length,pauActive:pauChase.active,pauX:pauChase.active?Math.round(pauChase.x):null,lostToPau,cratePresent:objects.some(o=>o.type==='crate'),cars:trafficCars.length,warnCars:carWarn.length,dogAlert:homeDogState.some(d=>d.state==='wake'||d.state==='lunge'),slip:slipT>0});
+  window.donKikoStatus=()=>({phase,stage,score,lives,x:Math.round(player.x),y:Math.round(player.bottom),friendX:Math.round(friend.x),objects:objects.length,pauActive:pauChase.active,pauX:pauChase.active?Math.round(pauChase.x):null,lostToPau,cratePresent:objects.some(o=>o.type==='crate'),cars:trafficCars.length,warnCars:carWarn.length,dogAlert:homeDogState.some(d=>d.state==='wake'||d.state==='lunge'),slip:slipT>0,retryScore,boss:boss?{anger:boss.anger,round:boss.round,phase:boss.phase,timer:Math.round(boss.timer*10)/10,choosing:boss.phase==='choose',selected:boss.selected,options:boss.choices.map(c=>c.text),correct:boss.choices.findIndex(c=>c.ok),shots:boss.shots.length,shotList:boss.shots.map(s=>({type:s.type,x:Math.round(s.x),y:Math.round(s.y),landX:s.landX?Math.round(s.landX):null})),coffee:boss.coffeeTaken?'tomado':boss.coffee?'disponible':null,sober:Math.round(boss.sober*10)/10,drunk:Math.round(boss.drunkBoost*10)/10}:null});
   // Comandos enviados por el dashboard.
   window.addEventListener('message',e=>{
     const d=e.data;
