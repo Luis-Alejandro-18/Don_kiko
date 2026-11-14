@@ -20,6 +20,7 @@
     playing: 'Jugando',
     paused: 'Pausa',
     intermission: 'Nivel superado',
+    retry: 'Reintento',
     lost: 'Game over',
     won: 'Victoria'
   };
@@ -698,6 +699,11 @@
       const lv = currentLevel();
       if (lv && d.stage !== lv.stage) {
         closeLevel(prev ? prev.elapsed * 1000 : undefined);
+        if (d.stage < lv.stage) {
+          // Reintento desde un nivel anterior (María manda al nivel 4):
+          // se descartan los intentos fallidos para no duplicar niveles en el historial.
+          state.current.levels = state.current.levels.filter(item => item.stage < d.stage);
+        }
         ensureLevel(d.stage);
       }
       if (d.phase === 'playing') {
@@ -780,6 +786,12 @@
         logEvent('Pau los atrapó', 'bad');
         const run = endRun('pau_caught', { score: d.score, stage: d.stage, lives: 0, cause: 'pau' });
         maybeOpenSurvey(run, true);
+        break;
+      }
+
+      case 'retry': {
+        // El nivel 5 devuelve al 4 sin cerrar la corrida: sigue siendo la misma campaña.
+        logEvent(`María lo mandó al sillón · vuelve al nivel ${d.to || 4}`, 'bad');
         break;
       }
 

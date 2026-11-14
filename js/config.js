@@ -6,7 +6,6 @@ window.DK_CONFIG = {
   supabaseKey: 'sb_publishable_OyLDM4HXhv9jHVPG77Sr5Q_HW16jwNE',
   leaderboardLimit: 50,
   // Niveles jugables de la campaña. Debe coincidir con LEVEL_NAMES del juego.
-  // Sube a 5 cuando se agregue el nivel nuevo.
-  totalLevels: 4,
-  levelWidths: { 1: 1000, 2: 1580, 3: 2470, 4: 2500 }
+  totalLevels: 5,
+  levelWidths: { 1: 1000, 2: 1580, 3: 2470, 4: 2500, 5: 1000 }
 };
